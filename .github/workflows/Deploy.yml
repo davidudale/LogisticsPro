@@ -1,0 +1,40 @@
+name: Deploy Subdomain to cPanel
+
+on:
+  push:
+    branches:
+      - main  # Confirm your branch name is 'main' or 'master'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Check out the code
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    # 2. Install Node.js
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+
+    # 3. Install Dependencies and Build
+    - name: Install and Build
+      run: |
+        npm install
+        npm run build
+
+    # 4. Upload to the Subdomain Folder
+    # ✅ CORRECT (Includes the secrets)
+    - name: SFTP Deploy
+      uses: wlixcc/SFTP-Deploy-Action@v1.2.4
+      with:
+        server: ${{ secrets.FTP_SERVER }}
+        username: ${{ secrets.FTP_USERNAME }}
+        password: ${{ secrets.FTP_PASSWORD }}
+        local_path: './dist/*'
+        remote_path: 'public_html/LogisticsPro/'
+        port: 22
+        sftp_only: true
