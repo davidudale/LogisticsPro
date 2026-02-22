@@ -1,35 +1,42 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React from "react";
+import "./App.css";
+import { Route, Routes } from "react-router-dom";
+import Homepage from "./Components/LandingPage/Homepage.jsx";
+import Login from "./Components/Auth/Login.jsx";
+import Register from "./Components/Auth/Register.jsx";
+import ProtectedRoute from "./Components/Auth/ProtectedRoute.jsx";
+import CustomersDashboard from "./Components/Dashboards/CustomersDashboard.jsx";
+import Drivers from "./Components/Dashboards/Drivers.jsx";
+import StaffDashboard from "./Components/Dashboards/StaffDashboard.jsx";
+import AdminDashboard from "./Components/Dashboards/AdminDashboard.jsx";
+import OrderManagement from "./Components/AdminFiles/OrderManagement/OrderManagement.jsx";
 
-function App() {
-  const [count, setCount] = useState(0)
-
+const App = () => {
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_bla">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    <Routes>
+    
+      <Route path="/" element={<Homepage />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
-export default App
+      <Route element={<ProtectedRoute allowedRoles={["customer"]} />}>
+        <Route path="/customer" element={<CustomersDashboard />} />
+      </Route>
+      <Route element={<ProtectedRoute allowedRoles={["driver"]} />}>
+        <Route path="/driver" element={<Drivers />} />
+      </Route>
+      <Route element={<ProtectedRoute allowedRoles={["staff"]} />}>
+        <Route path="/staff" element={<StaffDashboard />} />
+      </Route>
+      {/*Admin Routings*/} 
+      <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route path="/admin" element={<AdminDashboard />} />
+      </Route>
+      <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route path="/admin/orders" element={<OrderManagement />} />
+      </Route>
+    </Routes>
+  );
+};
+
+export default App;
