@@ -18,6 +18,19 @@ const Homepage = () => {
   const [theme, setTheme] = useState(
     () => localStorage.getItem("lp-theme") || "dark",
   );
+  const [businessForm, setBusinessForm] = useState({
+    isBusinessShipper: "yes",
+    companyName: "",
+    firstName: "",
+    lastName: "",
+    email: "",
+    address: "",
+    city: "",
+    country: "Nigeria",
+    phoneNumber: "",
+    internationalShipping: false,
+    shippingFrequency: "",
+  });
 
   const onGetStarted = () => navigate("/login");
 
@@ -29,8 +42,20 @@ const Homepage = () => {
 
   const toggleTheme = () =>
     setTheme((current) => (current === "light" ? "dark" : "light"));
+
+  const onBusinessFormChange = (event) => {
+    const { name, value, type, checked } = event.target;
+    setBusinessForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+    }));
+  };
+
+  const onBusinessFormSubmit = (event) => {
+    event.preventDefault();
+  };
   const heroImage =
-    "https://images.unsplash.com/photo-1765571394962-c8d03a8d0ef5?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=3000";
+    "https://images.unsplash.com/photo-1698321170838-27f96d9463af?q=80&w=387&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
   const warehouseImage =
     "https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=3000";
 
@@ -301,6 +326,163 @@ const Homepage = () => {
                 Talk to sales
               </button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="pb-24">
+        <div className="mx-auto max-w-7xl px-6">
+          <div className="lp-panel rounded-2xl p-6 sm:p-8">
+            <h3 className="text-3xl font-black text-white">
+              Open a LogisticsPro Business Account for Shipping Operations
+            </h3>
+            <p className="mt-4 text-sm text-slate-300">Are you a business shipper?</p>
+
+            <form onSubmit={onBusinessFormSubmit} className="mt-6 space-y-4">
+              <div className="flex items-center gap-6 text-sm text-slate-200">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="isBusinessShipper"
+                    value="yes"
+                    checked={businessForm.isBusinessShipper === "yes"}
+                    onChange={onBusinessFormChange}
+                  />
+                  Yes
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="isBusinessShipper"
+                    value="no"
+                    checked={businessForm.isBusinessShipper === "no"}
+                    onChange={onBusinessFormChange}
+                  />
+                  No
+                </label>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <label className="text-sm text-slate-300 sm:col-span-2">
+                  Company Name*
+                  <input
+                    type="text"
+                    name="companyName"
+                    value={businessForm.companyName}
+                    onChange={onBusinessFormChange}
+                    required
+                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                  />
+                </label>
+                <label className="text-sm text-slate-300">
+                  First Name*
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={businessForm.firstName}
+                    onChange={onBusinessFormChange}
+                    required
+                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                  />
+                </label>
+                <label className="text-sm text-slate-300">
+                  Last Name*
+                  <input
+                    type="text"
+                    name="lastName"
+                    value={businessForm.lastName}
+                    onChange={onBusinessFormChange}
+                    required
+                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                  />
+                </label>
+                <label className="text-sm text-slate-300 sm:col-span-2">
+                  Email Address*
+                  <input
+                    type="email"
+                    name="email"
+                    value={businessForm.email}
+                    onChange={onBusinessFormChange}
+                    required
+                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                  />
+                </label>
+                <label className="text-sm text-slate-300 sm:col-span-2">
+                  Address*
+                  <input
+                    type="text"
+                    name="address"
+                    value={businessForm.address}
+                    onChange={onBusinessFormChange}
+                    required
+                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                  />
+                </label>
+                <label className="text-sm text-slate-300">
+                  City*
+                  <input
+                    type="text"
+                    name="city"
+                    value={businessForm.city}
+                    onChange={onBusinessFormChange}
+                    required
+                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                  />
+                </label>
+                <label className="text-sm text-slate-300">
+                  Country*
+                  <input
+                    type="text"
+                    name="country"
+                    value={businessForm.country}
+                    onChange={onBusinessFormChange}
+                    required
+                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                  />
+                </label>
+                <label className="text-sm text-slate-300 sm:col-span-2">
+                  Phone Number*
+                  <input
+                    type="tel"
+                    name="phoneNumber"
+                    value={businessForm.phoneNumber}
+                    onChange={onBusinessFormChange}
+                    required
+                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                  />
+                </label>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-slate-200">
+                <input
+                  type="checkbox"
+                  name="internationalShipping"
+                  checked={businessForm.internationalShipping}
+                  onChange={onBusinessFormChange}
+                />
+                Do you ship internationally?
+              </label>
+
+              <label className="block text-sm text-slate-300">
+                How often do you ship?
+                <select
+                  name="shippingFrequency"
+                  value={businessForm.shippingFrequency}
+                  onChange={onBusinessFormChange}
+                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                >
+                  <option value="">Select frequency</option>
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="occasionally">Occasionally</option>
+                </select>
+              </label>
+
+              <button type="submit" className="lp-button-primary">
+                Open Business Account
+              </button>
+            </form>
           </div>
         </div>
       </section>

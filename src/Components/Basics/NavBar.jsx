@@ -1,70 +1,81 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Menu, Moon, Sun, Truck } from "lucide-react";
+import { LogOut, Menu, X } from "lucide-react";
 import { useAuth } from "../Auth/AuthContext.jsx";
 
 const NavBar = ({ title = "Dashboard", onToggleSidebar }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
-  const [theme, setTheme] = React.useState(
-    () => localStorage.getItem("lp-theme") || "dark",
-  );
-
-  React.useEffect(() => {
-    const nextTheme = theme === "light" ? "light" : "dark";
-    document.documentElement.setAttribute("data-theme", nextTheme);
-    localStorage.setItem("lp-theme", nextTheme);
-  }, [theme]);
-
-  const toggleTheme = () =>
-    setTheme((current) => (current === "light" ? "dark" : "light"));
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
     navigate("/login");
   };
 
+  const userName =
+    user?.displayName || user?.email?.split("@")[0] || user?.role || "User";
+
   return (
-    <header className="w-full border-b top-0 border-slate-800/70 bg-slate-950/80 backdrop-blur right-0 left-0">
-      <div className="mx-auto flex min-h-16 max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
-        <div className="flex items-center gap-2 sm:gap-3">
+    <header className="sticky top-0 w-full border-b border-slate-800 bg-slate-900/50 backdrop-blur-md z-50">
+      <div className="flex items-center justify-between p-4 lg:px-8">
+        <div className="flex items-center space-x-3">
           <button
             onClick={onToggleSidebar}
-            className="lg:hidden rounded-full border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-900"
+            className="lg:hidden p-2 text-white"
             aria-label="Open menu"
-            title="Open menu"
             type="button"
           >
-            <Menu size={16} />
+            <Menu />
           </button>
-          <div className="grid h-9 w-9 place-items-center rounded-xl bg-amber-500/15 text-amber-400">
-            <Truck size={18} />
+          <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-orange-700 rounded-sm flex items-center justify-center transform rotate-45">
+            <div className="w-3 h-3 bg-white rounded-full -rotate-45" />
           </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-slate-500">
-              {user?.role || "role"}
-            </p>
-            <h1 className="text-lg font-bold text-white">{title}</h1>
-          </div>
+          <span className="text-xl lg:text-2xl font-syncopate font-bold tracking-tighter text-white">
+            LogisticsPro<span className="text-orange-500">.</span>
+          </span>
         </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={toggleTheme}
-            className="rounded-full border border-slate-700 px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-900"
-            aria-label="Toggle theme"
-            title="Toggle theme"
-          >
-            {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
-          </button>
+
+        <div className="hidden md:flex items-center space-x-4">
+          <div className="flex flex-col items-end mr-2">
+            <span className="text-slate-400 text-[10px] uppercase tracking-widest font-bold">
+              {title}
+            </span>
+            <span className="text-white text-xs font-medium">{userName}</span>
+          </div>
           <button
             onClick={handleLogout}
-            className="lp-button-secondary flex items-center gap-2"
+            className="bg-red-900/40 hover:bg-red-700 text-white px-4 py-1.5 rounded-sm text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2"
           >
             <LogOut size={16} />
-            <span className="hidden sm:inline">Logout</span>
+            Logout
           </button>
         </div>
+
+        <button
+          className="md:hidden p-2 text-white"
+          onClick={() => setIsMenuOpen((prev) => !prev)}
+          type="button"
+          aria-label="Toggle mobile menu"
+        >
+          {isMenuOpen ? <X /> : <Menu />}
+        </button>
       </div>
+
+      {isMenuOpen && (
+        <div className="md:hidden border-t border-slate-800 bg-slate-900 p-4 space-y-4 flex flex-col">
+          <div className="w-full text-left px-2 py-2 text-sm text-slate-300">
+            {userName}
+          </div>
+          <button
+            className="w-full bg-red-900 text-white p-2 rounded-sm text-xs font-bold uppercase"
+            onClick={handleLogout}
+            type="button"
+          >
+            Logout
+          </button>
+        </div>
+      )}
     </header>
   );
 };

@@ -1,13 +1,13 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Mail, Lock, User, ShieldCheck, Truck, Building2 } from "lucide-react";
+import { ArrowBigLeftIcon } from "lucide-react";
 import { useAuth } from "./AuthContext.jsx";
 
 const roleOptions = [
-  { value: "customer", label: "Customer", icon: User },
-  { value: "driver", label: "Driver", icon: Truck },
-  { value: "staff", label: "Staff", icon: Building2 },
-  { value: "admin", label: "Admin", icon: ShieldCheck },
+  { value: "customer", label: "Customer" },
+  { value: "driver", label: "Driver" },
+  { value: "staff", label: "Staff" },
+  { value: "admin", label: "Admin" },
 ];
 
 const Register = () => {
@@ -22,11 +22,6 @@ const Register = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
-  const onChange = (event) => {
-    const { name, value } = event.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
 
   const onSubmit = async (event) => {
     event.preventDefault();
@@ -56,120 +51,105 @@ const Register = () => {
   };
 
   return (
-    <div className="min-h-screen lp-page-bg flex items-center justify-center px-4 py-12 sm:px-6 sm:py-16">
-      <div className="w-full max-w-lg lp-panel p-6 sm:p-8">
-        <div className="flex items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-amber-500/15 text-amber-400 grid place-items-center">
-            <ShieldCheck size={22} />
+    <div className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden bg-slate-950 text-slate-100 selection:bg-orange-500 selection:text-white">
+      <div className="absolute inset-0 z-0">
+        <img
+          src="https://images.unsplash.com/photo-1519003722824-194d4455a60c?q=80&w=1974&auto=format&fit=crop"
+          alt="Night logistics yard"
+          className="w-full h-full object-cover"
+        />
+        <div className="absolute inset-0 bg-slate-950/80" />
+      </div>
+
+      <div className="fixed top-0 left-0 w-full h-full pointer-events-none -z-10 opacity-30">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-orange-900/10 blur-[120px] rounded-full" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-900/10 blur-[120px] rounded-full" />
+      </div>
+
+      <div className="relative z-10 w-full max-w-md p-8 sm:p-10 space-y-8 glass-effect rounded-sm">
+        <div className="text-center">
+          <div className="flex items-center justify-center space-x-2 mb-6">
+            <div className="w-10 h-5 bg-gradient-to-br from-orange-500 to-orange-700 rounded-sm flex items-center justify-center transform rotate-45">
+              <div className="w-4 h-4 bg-white rounded-full -rotate-45" />
+            </div>
+
+            <span className="text-2xl font-syncopate font-bold tracking-tighter text-white capitalize">
+              LogisticsPro <span className="text-orange-500">.</span>
+            </span>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-white">Create your account</h1>
-            <p className="text-sm text-slate-400">
-              Start managing logistics with LogisticsPro.
-            </p>
-          </div>
+          <h2 className="text-l text-slate-300">Secure Operations Portal</h2>
         </div>
 
-        <form onSubmit={onSubmit} className="mt-8 space-y-5">
+        <form className="space-y-2" onSubmit={onSubmit}>
           <div>
-            <label className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
-              Full name
+            <label className="text-sm font-bold text-slate-400 uppercase tracking-widest block mb-2">
+              Assign Role
             </label>
-            <div className="mt-2 flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-2">
-              <User size={18} className="text-slate-500" />
-              <input
-                type="text"
-                name="fullName"
-                placeholder="Enter your full name"
-                value={form.fullName}
-                onChange={onChange}
-                className="w-full bg-transparent text-sm text-slate-100 outline-none"
-                required
-              />
-            </div>
+            <select
+              value={form.role}
+              onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))}
+              className="w-full bg-slate-900/50 border border-slate-700 px-4 py-2 text-sm text-white focus:border-orange-500 rounded-sm"
+            >
+              {roleOptions.map((role) => (
+                <option key={role.value} value={role.value}>
+                  {role.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-bold text-slate-400 uppercase tracking-widest block mb-2">
+              Full Name
+            </label>
+            <input
+              type="text"
+              required
+              value={form.fullName}
+              onChange={(e) => setForm((prev) => ({ ...prev, fullName: e.target.value }))}
+              className="w-full bg-slate-900/50 border border-slate-700 px-4 py-2 text-sm text-white focus:outline-none focus:border-orange-500 rounded-sm transition-colors"
+              placeholder="John Doe"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-bold text-slate-400 uppercase tracking-widest block mb-2">
+              Email Address
+            </label>
+            <input
+              type="email"
+              required
+              value={form.email}
+              onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+              className="w-full bg-slate-900/50 border border-slate-700 px-4 py-2 text-sm text-white focus:outline-none focus:border-orange-500 rounded-sm transition-colors"
+              placeholder="user@logisticspro.com"
+            />
           </div>
 
           <div>
-            <label className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
-              Email address
+            <label className="text-sm font-bold text-slate-400 uppercase tracking-widest block mb-2">
+              Password
             </label>
-            <div className="mt-2 flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-2">
-              <Mail size={18} className="text-slate-500" />
-              <input
-                type="email"
-                name="email"
-                placeholder="you@logisticspro.com"
-                value={form.email}
-                onChange={onChange}
-                className="w-full bg-transparent text-sm text-slate-100 outline-none"
-                required
-              />
-            </div>
+            <input
+              type="password"
+              required
+              value={form.password}
+              onChange={(e) => setForm((prev) => ({ ...prev, password: e.target.value }))}
+              className="w-full bg-slate-900/50 border border-slate-700 px-4 py-2 text-sm text-white focus:outline-none focus:border-orange-500 rounded-sm transition-colors"
+              placeholder="********"
+            />
           </div>
 
           <div>
-            <label className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
-              Role
+            <label className="text-sm font-bold text-slate-400 uppercase tracking-widest block mb-2">
+              Confirm Password
             </label>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              {roleOptions.map((role) => {
-                const Icon = role.icon;
-                const isActive = form.role === role.value;
-
-                return (
-                  <button
-                    key={role.value}
-                    type="button"
-                    onClick={() => setForm((prev) => ({ ...prev, role: role.value }))}
-                    className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm transition ${
-                      isActive
-                        ? "border-amber-400 bg-amber-500/10 text-amber-300"
-                        : "border-slate-700 text-slate-300 hover:border-slate-500"
-                    }`}
-                  >
-                    <Icon size={16} />
-                    {role.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
-                Password
-              </label>
-              <div className="mt-2 flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-2">
-                <Lock size={18} className="text-slate-500" />
-                <input
-                  type="password"
-                  name="password"
-                  placeholder="Create password"
-                  value={form.password}
-                  onChange={onChange}
-                  className="w-full bg-transparent text-sm text-slate-100 outline-none"
-                  required
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-500">
-                Confirm password
-              </label>
-              <div className="mt-2 flex items-center gap-3 rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-2">
-                <Lock size={18} className="text-slate-500" />
-                <input
-                  type="password"
-                  name="confirmPassword"
-                  placeholder="Repeat password"
-                  value={form.confirmPassword}
-                  onChange={onChange}
-                  className="w-full bg-transparent text-sm text-slate-100 outline-none"
-                  required
-                />
-              </div>
-            </div>
+            <input
+              type="password"
+              required
+              value={form.confirmPassword}
+              onChange={(e) => setForm((prev) => ({ ...prev, confirmPassword: e.target.value }))}
+              className="w-full bg-slate-900/50 border border-slate-700 px-4 py-2 text-sm text-white focus:outline-none focus:border-orange-500 rounded-sm transition-colors"
+              placeholder="********"
+            />
           </div>
 
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
@@ -177,18 +157,24 @@ const Register = () => {
           <button
             type="submit"
             disabled={loading}
-            className="lp-button-primary w-full flex items-center justify-center gap-2"
+            className="w-full px-10 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold uppercase tracking-widest transition-all hover:shadow-[0_0_20px_rgba(234,88,12,0.4)] rounded-sm disabled:opacity-70"
           >
-            {loading ? "Creating account..." : "Create account"}
+            {loading ? "Registering..." : "Register"}
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-slate-400">
-          Already have an account?{" "}
-          <Link to="/login" className="text-amber-300 hover:text-amber-200">
-            Sign in
-          </Link>
+        <p className="text-center text-sm text-slate-400">
+          Already have an account? <Link to="/login" className="font-medium text-orange-500 hover:text-orange-400">Sign in</Link>
         </p>
+
+        <button
+          onClick={() => navigate("/")}
+          className="w-full px-10 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold uppercase tracking-widest transition-all rounded-sm"
+          type="button"
+        >
+          <ArrowBigLeftIcon className="inline-block mr-2" size={20} />
+          Back to Homepage
+        </button>
       </div>
     </div>
   );

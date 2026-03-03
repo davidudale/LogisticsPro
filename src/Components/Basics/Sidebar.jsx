@@ -1,78 +1,106 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
 import {
-    Book,
   ClipboardList,
-  House,
+  FileText,
   LayoutDashboard,
   MapPin,
   Package,
-  Paperclip,
   Settings,
-  ShieldCheck,
+  Sliders,
   Truck,
   Users,
-  Users2,
   Warehouse,
+  Menu,
   X,
 } from "lucide-react";
 import { useAuth } from "../Auth/AuthContext.jsx";
 
 const roleLinks = {
   customer: [
-    { label: "Overview", to: "/customer", icon: LayoutDashboard },
+    { label: "Dashboard", to: "/customer", icon: LayoutDashboard },
     { label: "My Shipments", to: "/customer/shipments", icon: Package },
     { label: "Tracking", to: "/customer/tracking", icon: MapPin },
-    { label: "Support", to: "/customer/support", icon: ClipboardList },
+    { label: "Preferences", to: "/customer/settings", icon: Sliders },
   ],
   driver: [
-    { label: "Overview", to: "/driver", icon: LayoutDashboard },
+    { label: "Dashboard", to: "/driver", icon: LayoutDashboard },
     { label: "Assignments", to: "/driver/assignments", icon: Truck },
     { label: "Route Map", to: "/driver/routes", icon: MapPin },
-    { label: "Deliveries", to: "/driver/deliveries", icon: Package },
+    { label: "Delivery Logs", to: "/driver/deliveries", icon: ClipboardList },
   ],
   staff: [
-    { label: "Overview", to: "/staff", icon: LayoutDashboard },
+    { label: "Dashboard", to: "/staff", icon: LayoutDashboard },
     { label: "Dispatch", to: "/staff/dispatch", icon: Truck },
     { label: "Warehouses", to: "/staff/warehouses", icon: Warehouse },
     { label: "Customers", to: "/staff/customers", icon: Users },
   ],
   admin: [
-    { label: "Overview", to: "/admin", icon: LayoutDashboard },
-    { label: "Order Management", to: "/admin/orders", icon: Paperclip },
-    { label: "Route planning and optimization", to: "/admin/routing", icon: ClipboardList },
+    { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
+    { label: "Order Management", to: "/admin/orders", icon: ClipboardList },
     { label: "Fleet Management", to: "/admin/fleet", icon: Truck },
-    { label: "Warehouse management", to: "/admin/warehouse", icon: House },
-    { label: "Customer management", to: "/admin/fleet", icon: Users2 },
-    { label: "Reporting and analytics", to: "/admin/reports", icon: Book },
+    { label: "Warehouse", to: "/admin/warehouse", icon: Warehouse },
+    { label: "Reports", to: "/admin/reports", icon: FileText },
     { label: "Users", to: "/admin/users", icon: Users },
     { label: "Settings", to: "/admin/settings", icon: Settings },
   ],
 };
 
-
 const Sidebar = ({ open = false, onClose }) => {
   const { user } = useAuth();
+  const [isMobileExpanded, setIsMobileExpanded] = React.useState(false);
   const links = roleLinks[user?.role] || [];
+  const userLabel =
+    user?.displayName || user?.email?.split("@")[0] || user?.role || "User";
+
+  React.useEffect(() => {
+    if (open) {
+      setIsMobileExpanded(true);
+    }
+  }, [open]);
 
   return (
     <>
-      <aside className="hidden min-h-screen lg:flex lg:w-72 lg:flex-col border-r border-slate-800/70 bg-slate-950/80">
-        <div className="px-6 py-6">
-          <div className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-amber-500/15 text-amber-400">
-              <ShieldCheck size={18} />
+      <aside
+        className={`h-screen fixed border-r border-slate-800 bg-slate-900/20 transition-all duration-300 flex flex-col z-40 ${
+          isMobileExpanded ? "w-64" : "w-16"
+        } lg:w-64`}
+      >
+        <div className="p-4 lg:p-6 border-b border-slate-800/50">
+          <div className="flex items-center gap-4">
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileExpanded((prev) => !prev);
+                  onClose?.();
+                }}
+                className="ml-auto mb-4 relative lg:hidden p-2 rounded-lg border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"
+                aria-label="Toggle sidebar"
+              >
+                {isMobileExpanded ? <X size={16} /> : <Menu size={16} />}
+              </button>
+              <div className="w-8 h-8 lg:w-12 lg:h-12 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 p-0.5 shadow-orange-500/20">
+                <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center text-white font-bold text-xs lg:text-base">
+                  LP
+                </div>
+              </div>
+              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-950 rounded-full" />
             </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Role</p>
-              <p className="text-sm font-semibold text-white capitalize">
-                {user?.role || "user"}
+            <div
+              className={`${isMobileExpanded ? "block" : "hidden"} lg:block overflow-hidden`}
+            >
+              <p className="text-sm font-bold text-white uppercase tracking-tight truncate">
+                {userLabel}
+              </p>
+              <p className="text-xs text-slate-500 uppercase tracking-[0.2em]">
+                {user?.role || "role"}
               </p>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 px-4 pb-6 space-y-1">
+        <nav className="flex-1 bg-slate-900 overflow-y-auto py-4 px-3 space-y-1">
           {links.map((item) => {
             const Icon = item.icon;
             return (
@@ -80,15 +108,18 @@ const Sidebar = ({ open = false, onClose }) => {
                 key={item.to}
                 to={item.to}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  `flex items-center gap-3 rounded-xl p-3 text-sm font-semibold transition-all group ${
                     isActive
-                      ? "bg-amber-500/15 text-amber-300"
-                      : "text-slate-400 hover:text-white hover:bg-slate-900/60"
+                      ? "bg-orange-600/10 text-orange-500"
+                      : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
                   }`
                 }
+                onClick={onClose}
               >
                 <Icon size={18} />
-                {item.label}
+                <span className={`${isMobileExpanded ? "block" : "hidden"} lg:block`}>
+                  {item.label}
+                </span>
               </NavLink>
             );
           })}
@@ -96,7 +127,7 @@ const Sidebar = ({ open = false, onClose }) => {
       </aside>
 
       <div
-        className={`lg:hidden fixed inset-0 z-40 transition ${
+        className={`lg:hidden fixed inset-0 z-30 transition ${
           open ? "pointer-events-auto" : "pointer-events-none"
         }`}
       >
@@ -106,55 +137,6 @@ const Sidebar = ({ open = false, onClose }) => {
           }`}
           onClick={onClose}
         />
-        <aside
-          className={`absolute left-0 top-0 h-full w-72 bg-slate-950/95 border-r border-slate-800/80 backdrop-blur transition-transform ${
-            open ? "translate-x-0" : "-translate-x-full"
-          }`}
-        >
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/70">
-            <div className="flex items-center gap-3">
-              <div className="grid h-9 w-9 place-items-center rounded-xl bg-amber-500/15 text-amber-400">
-                <ShieldCheck size={18} />
-              </div>
-              <div>
-                <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Role</p>
-                <p className="text-sm font-semibold text-white capitalize">
-                  {user?.role || "user"}
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="rounded-full border border-slate-700 px-2 py-2 text-slate-200 hover:bg-slate-900"
-              aria-label="Close menu"
-              type="button"
-            >
-              <X size={16} />
-            </button>
-          </div>
-          <nav className="px-4 py-6 space-y-1">
-            {links.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  onClick={onClose}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                      isActive
-                        ? "bg-amber-500/15 text-amber-300"
-                        : "text-slate-400 hover:text-white hover:bg-slate-900/60"
-                    }`
-                  }
-                >
-                  <Icon size={18} />
-                  {item.label}
-                </NavLink>
-              );
-            })}
-          </nav>
-        </aside>
       </div>
     </>
   );

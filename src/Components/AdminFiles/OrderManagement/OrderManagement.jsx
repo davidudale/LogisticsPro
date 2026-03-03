@@ -75,14 +75,14 @@ const OrderManagement = () => {
   );
 
   return (
-    <div className="min-h-screen lp-page-bg">
+    <div className="flex flex-col min-h-screen bg-slate-950 text-slate-200">
       <NavBar
         title="Order Management"
         onToggleSidebar={() => setSidebarOpen(true)}
       />
-      <div className="flex">
+      <div className="flex flex-1 min-h-screen">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        <main className="flex-1 px-4 py-6 sm:px-6 sm:py-10">
+        <main className="flex-1 ml-16 lg:ml-64 p-4 lg:p-8 min-h-[calc(100vh-65px)] overflow-y-auto bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-slate-900/50 via-slate-950 to-slate-950">
           <div className="mx-auto max-w-6xl space-y-8">
             <header className="lp-panel p-6 sm:p-8">
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -335,3 +335,4 @@ const OrderManagement = () => {
 };
 
 export default OrderManagement;
+
