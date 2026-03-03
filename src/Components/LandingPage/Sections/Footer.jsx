@@ -15,8 +15,8 @@ const Footer = () => {
               </span>
             </div>
             <p className="text-slate-400 leading-relaxed mb-8 max-w-sm">
-              Unified logistics operations platform for dispatch, fleet, warehouse,
-              and customer delivery visibility.
+              Operational intelligence for modern fleets and coordinated delivery
+              execution across every region.
             </p>
           </div>
 
@@ -40,7 +40,7 @@ const Footer = () => {
 
           <div className="xl:col-span-4">
             <h5 className="text-white font-syncopate font-bold text-xs uppercase tracking-[0.2em] mb-8">Stay Informed</h5>
-            <p className="text-slate-400 text-sm mb-6">Receive product updates and logistics optimization tips.</p>
+            <p className="text-slate-400 text-sm mb-6">Get product updates, implementation tips, and operational insights.</p>
             <form className="flex flex-col sm:flex-row gap-3 sm:gap-0">
               <input
                 type="email"
@@ -55,7 +55,7 @@ const Footer = () => {
         </div>
 
         <div className="pt-8 sm:pt-10 border-t border-slate-800 flex flex-col lg:flex-row justify-between items-center gap-4 sm:gap-6">
-          <p className="text-slate-500 text-xs font-medium">(c) 2026 LogisticsPro. All Rights Reserved.</p>
+          <p className="text-slate-500 text-xs font-medium">(c) 2024 LogisticsPro. All Rights Reserved.</p>
           <div className="flex flex-wrap justify-center gap-5 sm:gap-8">
             <a href="#" className="text-slate-500 hover:text-white transition-colors text-xs font-medium">Privacy Policy</a>
             <a href="#" className="text-slate-500 hover:text-white transition-colors text-xs font-medium">Terms of Service</a>

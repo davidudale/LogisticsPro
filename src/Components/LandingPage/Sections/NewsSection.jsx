@@ -2,23 +2,23 @@ import React from "react";
 
 const news = [
   {
-    category: "Operations",
-    title: "How teams are reducing dispatch delays with centralized workflows",
-    date: "Case Study",
+    category: "Compliance",
+    title: "Audit trails, role-based access, and retention policies built in",
+    date: "Secure by Design",
     image:
       "https://images.unsplash.com/photo-1622554129912-c541b2542385?q=80&w=580&auto=format&fit=crop",
   },
   {
-    category: "Planning",
-    title: "Building resilient delivery networks through predictive routing",
-    date: "Platform Insight",
+    category: "Continuity",
+    title: "Multi-region resiliency with proactive anomaly detection",
+    date: "Reliability",
     image:
       "https://images.unsplash.com/photo-1678693361474-d9aa8a7a96cc?q=80&w=870&auto=format&fit=crop",
   },
   {
-    category: "Performance",
-    title: "Measuring warehouse throughput and route health in one dashboard",
-    date: "Team Ready",
+    category: "Experience",
+    title: "Operational intelligence for customers and modern fleet teams",
+    date: "Platform Value",
     image:
       "https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?q=80&w=2070&auto=format&fit=crop",
   },
@@ -26,13 +26,13 @@ const news = [
 
 const NewsSection = () => {
   return (
-    <section id="news" className="py-20 sm:py-24 lg:py-28 bg-slate-950">
+    <section id="security" className="py-20 sm:py-24 lg:py-28 bg-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-5 mb-12 sm:mb-14">
           <div>
             <p className="text-orange-500 text-xs font-bold uppercase tracking-[0.24em] mb-2">Product Impact</p>
             <h2 className="text-3xl sm:text-4xl font-syncopate font-bold text-white tracking-tight uppercase">
-              Why Teams Choose LogisticsPro
+              Secure By Design
             </h2>
           </div>
         </div>

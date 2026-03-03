@@ -10,6 +10,7 @@ import Drivers from "./Components/Dashboards/Drivers.jsx";
 import StaffDashboard from "./Components/Dashboards/StaffDashboard.jsx";
 import AdminDashboard from "./Components/Dashboards/AdminDashboard.jsx";
 import OrderManagement from "./Components/AdminFiles/OrderManagement/OrderManagement.jsx";
+import CustomerOnboard from "./Components/UsersManagement/CustomerOnboard.jsx";
 
 const App = () => {
   return (
@@ -18,15 +19,19 @@ const App = () => {
       <Route path="/" element={<Homepage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/customers-onboard" element={<CustomerOnboard />} />
 
-      <Route element={<ProtectedRoute allowedRoles={["customer"]} />}>
-        <Route path="/customer" element={<CustomersDashboard />} />
+      <Route element={<ProtectedRoute allowedRoles={["opsuser"]} />}>
+        <Route path="/opsuser" element={<CustomersDashboard />} />
+      </Route>
+      <Route element={<ProtectedRoute allowedRoles={["opsmanager"]} />}>
+        <Route path="/opsmanager" element={<StaffDashboard />} />
+      </Route>
+      <Route element={<ProtectedRoute allowedRoles={["accounts"]} />}>
+        <Route path="/accounts" element={<CustomersDashboard />} />
       </Route>
       <Route element={<ProtectedRoute allowedRoles={["driver"]} />}>
         <Route path="/driver" element={<Drivers />} />
-      </Route>
-      <Route element={<ProtectedRoute allowedRoles={["staff"]} />}>
-        <Route path="/staff" element={<StaffDashboard />} />
       </Route>
       {/*Admin Routings*/} 
       <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>

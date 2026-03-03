@@ -4,9 +4,10 @@ import { useAuth } from "../../Auth/AuthContext.jsx";
 
 const getDashboardPathByRole = (role) => {
   if (role === "admin") return "/admin";
-  if (role === "staff") return "/staff";
+  if (role === "opsmanager") return "/opsmanager";
+  if (role === "accounts") return "/accounts";
   if (role === "driver") return "/driver";
-  return "/customer";
+  return "/opsuser";
 };
 
 const LandingNavbar = () => {
@@ -15,11 +16,9 @@ const LandingNavbar = () => {
   const { user } = useAuth();
 
   const navLinks = [
-    { name: "Solutions", href: "#services" },
-    { name: "Network", href: "#sustainability" },
-    { name: "Operations", href: "#" },
-    { name: "Analytics", href: "#" },
-    { name: "Updates", href: "#news" },
+    { name: "Track", href: "#Track" },
+    { name: "Ship", href: "#Ship" },
+    { name: "Customer Service", href: "#CustomerService" },
   ];
 
   const userLabel = user?.displayName || user?.email?.split("@")[0] || "Account";
@@ -30,6 +29,10 @@ const LandingNavbar = () => {
       return;
     }
     navigate("/login");
+  };
+
+  const handleOnboardAction = () => {
+    navigate("/customers-onboard");
   };
 
   return (
@@ -63,11 +66,19 @@ const LandingNavbar = () => {
             )}
 
             <button
+              onClick={handleOnboardAction}
+              className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2.5 rounded-lg text-xs font-bold uppercase tracking-[0.2em] transition-all"
+              type="button"
+            >
+              Onboard
+            </button>
+
+            <button
               onClick={handleAccountAction}
               className="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-lg text-xs font-bold uppercase tracking-[0.2em] transition-all"
               type="button"
             >
-              {user ? "Dashboard" : "Login"}
+              {user ? "Dashboard" : "LOGIN"}
             </button>
           </div>
 
@@ -108,12 +119,23 @@ const LandingNavbar = () => {
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
+                handleOnboardAction();
+              }}
+              className="mt-2 w-full bg-slate-800 hover:bg-slate-700 text-white px-6 py-2.5 rounded-lg text-xs font-bold uppercase tracking-[0.2em] transition-all"
+              type="button"
+            >
+              Onboard Customer
+            </button>
+
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
                 handleAccountAction();
               }}
               className="mt-2 w-full bg-orange-600 hover:bg-orange-700 text-white px-6 py-2.5 rounded-lg text-xs font-bold uppercase tracking-[0.2em] transition-all"
               type="button"
             >
-              {user ? "Dashboard" : "Login"}
+              {user ? "Dashboard" : "LOGIN"}
             </button>
           </div>
         </div>

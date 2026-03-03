@@ -4,21 +4,22 @@ import { ArrowBigLeftIcon } from "lucide-react";
 import { useAuth } from "./AuthContext.jsx";
 
 const roleOptions = [
-  { value: "customer", label: "Customer" },
+  { value: "opsuser", label: "OPSUSER" },
+  { value: "opsmanager", label: "OPSMANAGER" },
+  { value: "accounts", label: "ACCOUNTS" },
   { value: "driver", label: "Driver" },
-  { value: "staff", label: "Staff" },
-  { value: "admin", label: "Admin" },
+  { value: "admin", label: "ADMIN" },
 ];
 
 const Register = () => {
   const navigate = useNavigate();
-  const { signup } = useAuth();
+  const { signup, logout } = useAuth();
   const [form, setForm] = useState({
     fullName: "",
     email: "",
     password: "",
     confirmPassword: "",
-    role: "customer",
+    role: "opsuser",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -42,6 +43,7 @@ const Register = () => {
       await signup(form.email, form.password, form.role, {
         fullName: form.fullName,
       });
+      await logout();
       navigate("/login");
     } catch (err) {
       setError(err?.message || "Registration failed.");

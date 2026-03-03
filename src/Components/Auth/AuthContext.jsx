@@ -3,6 +3,7 @@ import {
   createUserWithEmailAndPassword,
   getIdTokenResult,
   onAuthStateChanged,
+  sendEmailVerification,
   signInWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
@@ -19,19 +20,21 @@ const AuthContext = createContext(null);
 const db = getFirestore(app);
 
 const ROLE = {
-  CUSTOMER: "customer",
+  OPSUSER: "opsuser",
+  OPSMANAGER: "opsmanager",
+  ACCOUNTS: "accounts",
   DRIVER: "driver",
-  STAFF: "staff",
   ADMIN: "admin",
 };
 
 const normalizeRole = (value) => {
   const role = (value || "").toString().trim().toLowerCase();
-  if (role === "customer" || role === "customers") return ROLE.CUSTOMER;
+  if (role === "opsuser" || role === "customer" || role === "customers") return ROLE.OPSUSER;
+  if (role === "opsmanager" || role === "staff") return ROLE.OPSMANAGER;
+  if (role === "accounts" || role === "account") return ROLE.ACCOUNTS;
   if (role === "driver" || role === "drivers") return ROLE.DRIVER;
-  if (role === "staff") return ROLE.STAFF;
   if (role === "admin") return ROLE.ADMIN;
-  return ROLE.CUSTOMER;
+  return ROLE.OPSUSER;
 };
 
 export const AuthProvider = ({ children }) => {
@@ -79,8 +82,8 @@ export const AuthProvider = ({ children }) => {
           displayName: currentUser.displayName || "",
           photoURL: currentUser.photoURL || "",
           emailVerified: currentUser.emailVerified,
-          role: ROLE.CUSTOMER,
-          roles: [ROLE.CUSTOMER],
+          role: ROLE.OPSUSER,
+          roles: [ROLE.OPSUSER],
           profile: {},
         });
       } finally {
@@ -96,7 +99,7 @@ export const AuthProvider = ({ children }) => {
       user,
       loading,
       roles: ROLE,
-      signup: async (email, password, role = ROLE.CUSTOMER, profile = {}) => {
+      signup: async (email, password, role = ROLE.OPSUSER, profile = {}) => {
         const credential = await createUserWithEmailAndPassword(
           auth,
           email,
@@ -110,6 +113,11 @@ export const AuthProvider = ({ children }) => {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
         });
+        try {
+          await sendEmailVerification(credential.user);
+        } catch (verificationError) {
+          console.warn("Failed to send verification email on signup:", verificationError);
+        }
         return credential;
       },
       login: (email, password) =>
@@ -117,9 +125,10 @@ export const AuthProvider = ({ children }) => {
       logout: () => signOut(auth),
       hasRole: (role) => normalizeRole(user?.role) === normalizeRole(role),
       isAdmin: normalizeRole(user?.role) === ROLE.ADMIN,
-      isStaff: normalizeRole(user?.role) === ROLE.STAFF,
+      isOpsManager: normalizeRole(user?.role) === ROLE.OPSMANAGER,
+      isAccounts: normalizeRole(user?.role) === ROLE.ACCOUNTS,
       isDriver: normalizeRole(user?.role) === ROLE.DRIVER,
-      isCustomer: normalizeRole(user?.role) === ROLE.CUSTOMER,
+      isOpsUser: normalizeRole(user?.role) === ROLE.OPSUSER,
     }),
     [user, loading],
   );

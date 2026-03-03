@@ -17,23 +17,29 @@ import {
 import { useAuth } from "../Auth/AuthContext.jsx";
 
 const roleLinks = {
-  customer: [
-    { label: "Dashboard", to: "/customer", icon: LayoutDashboard },
-    { label: "My Shipments", to: "/customer/shipments", icon: Package },
-    { label: "Tracking", to: "/customer/tracking", icon: MapPin },
-    { label: "Preferences", to: "/customer/settings", icon: Sliders },
+  opsuser: [
+    { label: "Dashboard", to: "/opsuser", icon: LayoutDashboard },
+    { label: "My Shipments", to: "/opsuser/shipments", icon: Package },
+    { label: "Tracking", to: "/opsuser/tracking", icon: MapPin },
+    { label: "Preferences", to: "/opsuser/settings", icon: Sliders },
+  ],
+  opsmanager: [
+    { label: "Dashboard", to: "/opsmanager", icon: LayoutDashboard },
+    { label: "Dispatch", to: "/opsmanager/dispatch", icon: Truck },
+    { label: "Warehouses", to: "/opsmanager/warehouses", icon: Warehouse },
+    { label: "Customers", to: "/opsmanager/customers", icon: Users },
+  ],
+  accounts: [
+    { label: "Dashboard", to: "/accounts", icon: LayoutDashboard },
+    { label: "Invoices", to: "/accounts/invoices", icon: FileText },
+    { label: "Payments", to: "/accounts/payments", icon: ClipboardList },
+    { label: "Preferences", to: "/accounts/settings", icon: Sliders },
   ],
   driver: [
     { label: "Dashboard", to: "/driver", icon: LayoutDashboard },
     { label: "Assignments", to: "/driver/assignments", icon: Truck },
     { label: "Route Map", to: "/driver/routes", icon: MapPin },
     { label: "Delivery Logs", to: "/driver/deliveries", icon: ClipboardList },
-  ],
-  staff: [
-    { label: "Dashboard", to: "/staff", icon: LayoutDashboard },
-    { label: "Dispatch", to: "/staff/dispatch", icon: Truck },
-    { label: "Warehouses", to: "/staff/warehouses", icon: Warehouse },
-    { label: "Customers", to: "/staff/customers", icon: Users },
   ],
   admin: [
     { label: "Dashboard", to: "/admin", icon: LayoutDashboard },

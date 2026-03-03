@@ -1,7 +1,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext.jsx";
 
-const getRoleHomePath = (role) => `/${role || "customer"}`;
+const getRoleHomePath = (role) => `/${role || "opsuser"}`;
 
 const ProtectedRoute = ({ allowedRoles = [] }) => {
   const { user, loading } = useAuth();

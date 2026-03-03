@@ -2,10 +2,10 @@ import React from "react";
 
 const Stats = () => {
   const stats = [
-    { label: "Anytime Access", value: "Cloud", suffix: "+ Mobile" },
-    { label: "Route Precision", value: "Higher", suffix: "Efficiency" },
-    { label: "Fleet Safety", value: "Proactive", suffix: "Risk Alerts" },
-    { label: "Compliance", value: "Always", suffix: "Audit-Ready" },
+    { label: "Regions covered", value: "37", suffix: "Markets" },
+    { label: "Throughput", value: "+18%", suffix: "Warehouse Flow" },
+    { label: "Dwell time", value: "-27%", suffix: "Optimization" },
+    { label: "Fleet health", value: "A+", suffix: "Compliance" },
   ];
 
   return (

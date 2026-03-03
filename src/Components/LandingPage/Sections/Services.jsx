@@ -2,23 +2,23 @@ import React from "react";
 
 const services = [
   {
-    title: "Go Digital",
+    title: "Dispatch + Routing",
     description:
-      "Replace paper logs with guided workflows, structured updates, and centralized delivery records.",
+      "Real-time orchestration, proactive alerts, and clear SLA execution across every shipment.",
     image:
-      "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=1887&auto=format&fit=crop",
+      "https://images.unsplash.com/photo-1711261728219-4d9fda47a514?q=80&w=868&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
   },
   {
-    title: "Real-time Visibility",
+    title: "Warehouse Visibility",
     description:
-      "Monitor shipment state and warehouse movement as soon as teams update tasks in the field.",
+      "Monitor hubs, lanes, and cross-docks with predictive demand planning and exception handling.",
     image:
       "https://images.unsplash.com/photo-1541888946425-d81bb19240f5?q=80&w=2070&auto=format&fit=crop",
   },
   {
-    title: "Connected Operations",
+    title: "Customer Experience",
     description:
-      "Sync LogisticsPro with your existing ERP, carrier, and customer systems for end-to-end control.",
+      "From order intake to last-mile proof, every step is coordinated through a single operational layer.",
     image:
       "https://images.unsplash.com/photo-1497435334941-8c899ee9e8e9?q=80&w=1975&auto=format&fit=crop",
   },
@@ -26,16 +26,16 @@ const services = [
 
 const Services = () => {
   return (
-    <section id="services" className="py-20 sm:py-24 lg:py-28 bg-slate-950">
+    <section id="capabilities" className="py-20 sm:py-24 lg:py-28 bg-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 mb-12 sm:mb-14">
           <div className="max-w-3xl">
             <h2 className="text-orange-500 font-bold uppercase tracking-[0.28em] text-xs sm:text-sm mb-3">
-              Core Capabilities
+              Operations, unified
             </h2>
             <h3 className="text-3xl sm:text-4xl lg:text-5xl font-syncopate font-bold text-white leading-[1.05]">
               SMART TOOLS FOR
-              <span className="block text-slate-300">MODERN LOGISTICS</span>
+              <span className="block text-slate-300">MODERN OPERATIONS</span>
             </h3>
           </div>
           <button className="self-start lg:self-auto text-slate-300 hover:text-orange-400 flex items-center gap-2 group transition-colors uppercase tracking-[0.18em] text-[11px] font-bold" type="button">
