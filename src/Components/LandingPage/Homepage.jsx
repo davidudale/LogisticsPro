@@ -55,7 +55,7 @@ const Homepage = () => {
     event.preventDefault();
   };
   const heroImage =
-    "https://images.unsplash.com/photo-1698321170838-27f96d9463af?q=80&w=387&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
+    "https://images.unsplash.com/photo-1695222833131-54ee679ae8e5?q=80&w=841&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D";
   const warehouseImage =
     "https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&fm=jpg&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&ixlib=rb-4.1.0&q=60&w=3000";
 
@@ -75,13 +75,13 @@ const Homepage = () => {
           </div>
           <div className="hidden items-center gap-8 text-sm font-semibold text-slate-400 md:flex">
             <a href="#capabilities" className="hover:text-white transition-colors">
-              Capabilities
+              Track
             </a>
             <a href="#network" className="hover:text-white transition-colors">
-              Network
+              Ship
             </a>
             <a href="#security" className="hover:text-white transition-colors">
-              Security
+              Customer Service
             </a>
           </div>
           <div className="flex items-center gap-3">
@@ -94,7 +94,7 @@ const Homepage = () => {
               {theme === "light" ? <Moon size={16} /> : <Sun size={16} />}
             </button>
             <button onClick={onGetStarted} className="lp-button-primary">
-              Launch Dashboard
+              Customer Portal Login
             </button>
           </div>
         </div>
@@ -107,9 +107,8 @@ const Homepage = () => {
               <div className="inline-flex items-center gap-2 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.3em] text-amber-300">
                 Precision logistics platform
               </div>
-              <h1 className="mt-6 text-4xl font-black tracking-tight text-white sm:text-6xl">
-                Orchestrate deliveries with
-                <span className="block text-amber-400">real-time control.</span>
+              <h1 className="mt-6 text-md font-black tracking-tight text-white sm:text-6xl">
+                Orchestrate deliveries with <span className="text-amber-600">real-time control.</span>
               </h1>
               <p className="mt-6 max-w-xl text-lg text-slate-400">
                 LogisticsPro unifies fleet tracking, dispatch, warehouse flow, and
@@ -120,7 +119,7 @@ const Homepage = () => {
                   onClick={onGetStarted}
                   className="lp-button-primary flex items-center gap-2"
                 >
-                  Start optimizing
+                  Track your Shipment
                   <ArrowRight size={16} />
                 </button>
                 <button className="lp-button-secondary">
@@ -230,16 +229,16 @@ const Homepage = () => {
         <div className="mx-auto max-w-7xl px-6">
           <div className="grid gap-12 lg:grid-cols-[1fr_1fr]">
             <div className="lp-panel rounded-3xl p-8">
-              <h3 className="text-2xl font-bold text-white">Global control tower</h3>
+              <h3 className="text-2xl font-bold text-white">Services Available</h3>
               <p className="mt-4 text-slate-400">
                 Monitor hubs, lanes, and cross-docks with predictive demand
                 planning and automated exception handling.
               </p>
               <ul className="mt-6 space-y-3 text-sm text-slate-300">
                 {[
-                  "Dynamic lane balancing",
-                  "Carbon-aware routing",
-                  "Integrated carrier scoring",
+                  "Road Freight",
+                  "⁠Rail Freight",
+                  
                 ].map((item) => (
                   <li key={item} className="flex items-center gap-2">
                     <CheckCircle2 className="text-emerald-400" size={16} />
@@ -332,14 +331,14 @@ const Homepage = () => {
 
       <section className="pb-24">
         <div className="mx-auto max-w-7xl px-6">
-          <div className="lp-panel rounded-2xl p-6 sm:p-8">
-            <h3 className="text-3xl font-black text-white">
+          <div className="rounded-md border border-slate-300 bg-[#e6e6e6] p-6 sm:p-8 shadow-xl">
+            <h3 className="text-3xl font-black text-slate-900">
               Open a LogisticsPro Business Account for Shipping Operations
             </h3>
-            <p className="mt-4 text-sm text-slate-300">Are you a business shipper?</p>
+            <p className="mt-4 text-sm text-slate-900">Are you a business shipper?</p>
 
             <form onSubmit={onBusinessFormSubmit} className="mt-6 space-y-4">
-              <div className="flex items-center gap-6 text-sm text-slate-200">
+              <div className="flex items-center gap-6 text-sm text-slate-900">
                 <label className="flex items-center gap-2">
                   <input
                     type="radio"
@@ -363,7 +362,7 @@ const Homepage = () => {
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <label className="text-sm text-slate-300 sm:col-span-2">
+                <label className="text-sm text-slate-900 sm:col-span-2">
                   Company Name*
                   <input
                     type="text"
@@ -371,10 +370,10 @@ const Homepage = () => {
                     value={businessForm.companyName}
                     onChange={onBusinessFormChange}
                     required
-                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                    className="mt-1 w-full rounded-none border border-slate-500 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-red-600"
                   />
                 </label>
-                <label className="text-sm text-slate-300">
+                <label className="text-sm text-slate-900">
                   First Name*
                   <input
                     type="text"
@@ -382,10 +381,10 @@ const Homepage = () => {
                     value={businessForm.firstName}
                     onChange={onBusinessFormChange}
                     required
-                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                    className="mt-1 w-full rounded-none border border-slate-500 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-red-600"
                   />
                 </label>
-                <label className="text-sm text-slate-300">
+                <label className="text-sm text-slate-900">
                   Last Name*
                   <input
                     type="text"
@@ -393,10 +392,10 @@ const Homepage = () => {
                     value={businessForm.lastName}
                     onChange={onBusinessFormChange}
                     required
-                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                    className="mt-1 w-full rounded-none border border-slate-500 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-red-600"
                   />
                 </label>
-                <label className="text-sm text-slate-300 sm:col-span-2">
+                <label className="text-sm text-slate-900 sm:col-span-2">
                   Email Address*
                   <input
                     type="email"
@@ -404,10 +403,10 @@ const Homepage = () => {
                     value={businessForm.email}
                     onChange={onBusinessFormChange}
                     required
-                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                    className="mt-1 w-full rounded-none border border-slate-500 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-red-600"
                   />
                 </label>
-                <label className="text-sm text-slate-300 sm:col-span-2">
+                <label className="text-sm text-slate-900 sm:col-span-2">
                   Address*
                   <input
                     type="text"
@@ -415,10 +414,10 @@ const Homepage = () => {
                     value={businessForm.address}
                     onChange={onBusinessFormChange}
                     required
-                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                    className="mt-1 w-full rounded-none border border-slate-500 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-red-600"
                   />
                 </label>
-                <label className="text-sm text-slate-300">
+                <label className="text-sm text-slate-900">
                   City*
                   <input
                     type="text"
@@ -426,10 +425,10 @@ const Homepage = () => {
                     value={businessForm.city}
                     onChange={onBusinessFormChange}
                     required
-                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                    className="mt-1 w-full rounded-none border border-slate-500 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-red-600"
                   />
                 </label>
-                <label className="text-sm text-slate-300">
+                <label className="text-sm text-slate-900">
                   Country*
                   <input
                     type="text"
@@ -437,10 +436,10 @@ const Homepage = () => {
                     value={businessForm.country}
                     onChange={onBusinessFormChange}
                     required
-                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                    className="mt-1 w-full rounded-none border border-slate-500 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-red-600"
                   />
                 </label>
-                <label className="text-sm text-slate-300 sm:col-span-2">
+                <label className="text-sm text-slate-900 sm:col-span-2">
                   Phone Number*
                   <input
                     type="tel"
@@ -448,12 +447,19 @@ const Homepage = () => {
                     value={businessForm.phoneNumber}
                     onChange={onBusinessFormChange}
                     required
-                    className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                    className="mt-1 w-full rounded-none border border-slate-500 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-red-600"
                   />
                 </label>
               </div>
 
-              <label className="flex items-center gap-2 text-sm text-slate-200">
+              <p className="text-xs text-slate-800">
+                * If you are outside Nigeria, go to this{" "}
+                <a href="#" className="text-red-700 underline">
+                  page
+                </a>
+              </p>
+
+              <label className="flex items-center gap-2 text-sm text-slate-900">
                 <input
                   type="checkbox"
                   name="internationalShipping"
@@ -463,13 +469,13 @@ const Homepage = () => {
                 Do you ship internationally?
               </label>
 
-              <label className="block text-sm text-slate-300">
+              <label className="block text-sm text-slate-900">
                 How often do you ship?
                 <select
                   name="shippingFrequency"
                   value={businessForm.shippingFrequency}
                   onChange={onBusinessFormChange}
-                  className="mt-1 w-full rounded-md border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-amber-400"
+                  className="mt-1 w-full rounded-none border border-slate-500 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-red-600"
                 >
                   <option value="">Select frequency</option>
                   <option value="daily">Daily</option>
@@ -479,7 +485,10 @@ const Homepage = () => {
                 </select>
               </label>
 
-              <button type="submit" className="lp-button-primary">
+              <button
+                type="submit"
+                className="rounded-none bg-[#ffcc00] px-6 py-2 text-xs font-bold uppercase tracking-[0.15em] text-slate-900 hover:bg-[#e3b700]"
+              >
                 Open Business Account
               </button>
             </form>
