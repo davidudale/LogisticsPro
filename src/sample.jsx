@@ -8,7 +8,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import {
-  Truck,
+  
   UserRound,
   ShieldCheck,
   Building2,
