@@ -24,8 +24,13 @@ const COLLECTIONS = {
 };
 
 const emptyCustomerForm = {
+  accountType: "business",
   companyName: "",
   contactName: "",
+  contactRole: "",
+  companyRegistrationNumber: "",
+  industry: "",
+  companySize: "",
   email: "",
   phone: "",
 };
@@ -79,7 +84,12 @@ const CustomerManagement = () => {
       (customer) =>
         customer.companyName.toLowerCase().includes(value) ||
         customer.contactName.toLowerCase().includes(value) ||
-        customer.email.toLowerCase().includes(value),
+        customer.email.toLowerCase().includes(value) ||
+        customer.accountType.toLowerCase().includes(value) ||
+        customer.contactRole.toLowerCase().includes(value) ||
+        customer.companyRegistrationNumber.toLowerCase().includes(value) ||
+        customer.industry.toLowerCase().includes(value) ||
+        customer.companySize.toLowerCase().includes(value),
     );
   }, [customers, query]);
 
@@ -98,10 +108,39 @@ const CustomerManagement = () => {
           const data = item.data();
           return {
             id: item.id,
-            companyName: data.companyName || data.company || "",
-            contactName: data.contactName || data.contact || "",
-            email: data.email || "",
+            accountType: data.accountType || "business",
+            companyName:
+              data.companyName ||
+              data.businessProfile?.legalName ||
+              data.company ||
+              "",
+            contactName:
+              data.contactName ||
+              data.businessProfile?.primaryContact?.name ||
+              data.contact ||
+              "",
+            contactRole:
+              data.contactRole ||
+              data.businessProfile?.primaryContact?.role ||
+              "",
+            companyRegistrationNumber:
+              data.companyRegistrationNumber ||
+              data.businessProfile?.registrationNumber ||
+              "",
+            industry: data.industry || data.businessProfile?.industry || "",
+            companySize: data.companySize || data.businessProfile?.companySize || "",
+            email: data.businessEmail || data.email || "",
             phone: data.phone || "",
+            emailVerified:
+              typeof data.emailVerified === "boolean"
+                ? data.emailVerified
+                : data.verification?.email?.status === "verified",
+            phoneVerified:
+              typeof data.phoneVerified === "boolean"
+                ? data.phoneVerified
+                : data.verification?.phone?.status === "verified",
+            emailVerificationStatus: data.verification?.email?.status || "pending",
+            phoneVerificationStatus: data.verification?.phone?.status || "pending",
           };
         }),
       );
@@ -150,10 +189,27 @@ const CustomerManagement = () => {
     setBusyRow("customer-add");
     try {
       await addDoc(collection(db, COLLECTIONS.customers), {
+        accountType: customerForm.accountType,
         companyName: customerForm.companyName.trim(),
         contactName: customerForm.contactName.trim(),
+        contactRole: customerForm.contactRole.trim(),
+        companyRegistrationNumber: customerForm.companyRegistrationNumber.trim(),
+        industry: customerForm.industry.trim(),
+        companySize: customerForm.companySize.trim(),
         email: customerForm.email.trim().toLowerCase(),
         phone: customerForm.phone.trim(),
+        businessProfile: customerForm.accountType === "business" ? {
+          legalName: customerForm.companyName.trim(),
+          registrationNumber: customerForm.companyRegistrationNumber.trim(),
+          industry: customerForm.industry.trim(),
+          companySize: customerForm.companySize.trim(),
+          primaryContact: {
+            name: customerForm.contactName.trim(),
+            role: customerForm.contactRole.trim(),
+            email: customerForm.email.trim().toLowerCase(),
+            phone: customerForm.phone.trim(),
+          },
+        } : null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -172,10 +228,27 @@ const CustomerManagement = () => {
     setBusyRow(customerId);
     try {
       await updateDoc(doc(db, COLLECTIONS.customers, customerId), {
+        accountType: editCustomer.accountType.trim() || "business",
         companyName: editCustomer.companyName.trim(),
         contactName: editCustomer.contactName.trim(),
+        contactRole: editCustomer.contactRole.trim(),
+        companyRegistrationNumber: editCustomer.companyRegistrationNumber.trim(),
+        industry: editCustomer.industry.trim(),
+        companySize: editCustomer.companySize.trim(),
         email: editCustomer.email.trim().toLowerCase(),
         phone: editCustomer.phone.trim(),
+        businessProfile: (editCustomer.accountType.trim() || "business") === "business" ? {
+          legalName: editCustomer.companyName.trim(),
+          registrationNumber: editCustomer.companyRegistrationNumber.trim(),
+          industry: editCustomer.industry.trim(),
+          companySize: editCustomer.companySize.trim(),
+          primaryContact: {
+            name: editCustomer.contactName.trim(),
+            role: editCustomer.contactRole.trim(),
+            email: editCustomer.email.trim().toLowerCase(),
+            phone: editCustomer.phone.trim(),
+          },
+        } : null,
         updatedAt: serverTimestamp(),
       });
       setEditingCustomerId("");
@@ -387,14 +460,21 @@ const CustomerManagement = () => {
                 </div>
               <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-2">
                 <Search size={16} className="text-slate-400" />
-                <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-transparent text-sm text-white outline-none" placeholder="Search company, contact, or email..." />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-transparent text-sm text-white outline-none" placeholder="Search company, contact, email, registration no, or industry..." />
               </div>
               <div className="overflow-auto">
-                <table className="w-full min-w-[760px] text-sm">
+                <table className="w-full min-w-[1180px] text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
+                      <th className="px-3 py-2">Type</th>
                       <th className="px-3 py-2">Company</th>
                       <th className="px-3 py-2">Contact</th>
+                      <th className="px-3 py-2">Role</th>
+                      <th className="px-3 py-2">Registration No</th>
+                      <th className="px-3 py-2">Industry</th>
+                      <th className="px-3 py-2">Size</th>
+                      <th className="px-3 py-2">Email Verify</th>
+                      <th className="px-3 py-2">Phone Verify</th>
                       <th className="px-3 py-2">Email</th>
                       <th className="px-3 py-2">Phone</th>
                       <th className="px-3 py-2">Actions</th>
@@ -402,12 +482,32 @@ const CustomerManagement = () => {
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan={5} className="px-3 py-4 text-slate-500">Loading...</td></tr>
+                      <tr><td colSpan={12} className="px-3 py-4 text-slate-500">Loading...</td></tr>
                     ) : filteredCustomers.length === 0 ? (
-                      <tr><td colSpan={5} className="px-3 py-4 text-slate-500">No customer records.</td></tr>
+                      <tr><td colSpan={12} className="px-3 py-4 text-slate-500">No customer records.</td></tr>
                     ) : (
                       filteredCustomers.map((row) => (
                         <tr key={row.id} className="border-t border-slate-800">
+                          <td className="px-3 py-3">
+                            {editingCustomerId === row.id ? (
+                              <select
+                                value={editCustomer.accountType}
+                                onChange={(e) => setEditCustomer((p) => ({ ...p, accountType: e.target.value }))}
+                                className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500"
+                              >
+                                <option value="business">Business</option>
+                                <option value="individual">Individual</option>
+                              </select>
+                            ) : (
+                              <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${
+                                row.accountType === "individual"
+                                  ? "bg-sky-500/15 text-sky-300"
+                                  : "bg-emerald-500/15 text-emerald-300"
+                              }`}>
+                                {row.accountType}
+                              </span>
+                            )}
+                          </td>
                           <td className="px-3 py-3">
                             {editingCustomerId === row.id ? (
                               <input value={editCustomer.companyName} onChange={(e) => setEditCustomer((p) => ({ ...p, companyName: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
@@ -417,6 +517,44 @@ const CustomerManagement = () => {
                             {editingCustomerId === row.id ? (
                               <input value={editCustomer.contactName} onChange={(e) => setEditCustomer((p) => ({ ...p, contactName: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
                             ) : row.contactName}
+                          </td>
+                          <td className="px-3 py-3 text-slate-300">
+                            {editingCustomerId === row.id ? (
+                              <input value={editCustomer.contactRole} onChange={(e) => setEditCustomer((p) => ({ ...p, contactRole: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
+                            ) : row.contactRole || <span className="text-slate-500">-</span>}
+                          </td>
+                          <td className="px-3 py-3 text-slate-300">
+                            {editingCustomerId === row.id ? (
+                              <input value={editCustomer.companyRegistrationNumber} onChange={(e) => setEditCustomer((p) => ({ ...p, companyRegistrationNumber: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
+                            ) : row.companyRegistrationNumber || <span className="text-slate-500">-</span>}
+                          </td>
+                          <td className="px-3 py-3 text-slate-300">
+                            {editingCustomerId === row.id ? (
+                              <input value={editCustomer.industry} onChange={(e) => setEditCustomer((p) => ({ ...p, industry: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
+                            ) : row.industry || <span className="text-slate-500">-</span>}
+                          </td>
+                          <td className="px-3 py-3 text-slate-300">
+                            {editingCustomerId === row.id ? (
+                              <input value={editCustomer.companySize} onChange={(e) => setEditCustomer((p) => ({ ...p, companySize: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
+                            ) : row.companySize || <span className="text-slate-500">-</span>}
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${
+                              row.emailVerified
+                                ? "bg-emerald-500/15 text-emerald-300"
+                                : "bg-amber-500/15 text-amber-300"
+                            }`}>
+                              {row.emailVerified ? "verified" : row.emailVerificationStatus}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${
+                              row.phoneVerified
+                                ? "bg-emerald-500/15 text-emerald-300"
+                                : "bg-sky-500/15 text-sky-300"
+                            }`}>
+                              {row.phoneVerified ? "verified" : row.phoneVerificationStatus}
+                            </span>
                           </td>
                           <td className="px-3 py-3 text-slate-400">
                             {editingCustomerId === row.id ? (
@@ -436,7 +574,7 @@ const CustomerManagement = () => {
                               </div>
                             ) : (
                               <div className="flex items-center gap-2">
-                                <button type="button" onClick={() => { setEditingCustomerId(row.id); setEditCustomer({ companyName: row.companyName, contactName: row.contactName, email: row.email, phone: row.phone }); }} className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
+                                <button type="button" onClick={() => { setEditingCustomerId(row.id); setEditCustomer({ accountType: row.accountType, companyName: row.companyName, contactName: row.contactName, contactRole: row.contactRole, companyRegistrationNumber: row.companyRegistrationNumber, industry: row.industry, companySize: row.companySize, email: row.email, phone: row.phone }); }} className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
                                   <Pencil size={12} /> Edit
                                 </button>
                                 <button type="button" onClick={() => deleteCustomer(row.id)} disabled={busyRow === row.id} className="inline-flex items-center gap-1 rounded-md border border-rose-500/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10">
@@ -617,8 +755,16 @@ const CustomerManagement = () => {
                     }}
                     className="mt-4 grid gap-3 sm:grid-cols-2"
                   >
+                    <select value={customerForm.accountType} onChange={(e) => setCustomerForm((p) => ({ ...p, accountType: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" required>
+                      <option value="business">Business</option>
+                      <option value="individual">Individual</option>
+                    </select>
                     <input value={customerForm.companyName} onChange={(e) => setCustomerForm((p) => ({ ...p, companyName: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Company" required />
                     <input value={customerForm.contactName} onChange={(e) => setCustomerForm((p) => ({ ...p, contactName: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Contact" required />
+                    <input value={customerForm.contactRole} onChange={(e) => setCustomerForm((p) => ({ ...p, contactRole: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Role" />
+                    <input value={customerForm.companyRegistrationNumber} onChange={(e) => setCustomerForm((p) => ({ ...p, companyRegistrationNumber: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Registration No" />
+                    <input value={customerForm.industry} onChange={(e) => setCustomerForm((p) => ({ ...p, industry: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Industry" />
+                    <input value={customerForm.companySize} onChange={(e) => setCustomerForm((p) => ({ ...p, companySize: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Company Size" />
                     <input type="email" value={customerForm.email} onChange={(e) => setCustomerForm((p) => ({ ...p, email: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Email" required />
                     <input value={customerForm.phone} onChange={(e) => setCustomerForm((p) => ({ ...p, phone: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Phone" required />
                     <button type="submit" disabled={busyRow === "customer-add"} className="sm:col-span-2 rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-70">

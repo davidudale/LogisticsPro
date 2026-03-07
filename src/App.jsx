@@ -14,6 +14,7 @@ import AdminDashboard from "./Components/Dashboards/AdminDashboard.jsx";
 import OrderManagement from "./Components/AdminFiles/OrderManagement/OrderManagement.jsx";
 import FleetManagement from "./Components/AdminFiles/FleetManagement/FleetManagement.jsx";
 import CustomerOnboard from "./Components/UsersManagement/CustomerOnboard.jsx";
+import CustomerRegistration from "./Components/UsersManagement/CustomerRegistration.jsx";
 import CustomerManagement from "./Components/AdminFiles/CustomerManagement/CustomerManagement.jsx";
 
 const App = () => {
@@ -24,6 +25,7 @@ const App = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/customers-onboard" element={<CustomerOnboard />} />
+        <Route path="/customers-onboard/register/:accountType" element={<CustomerRegistration />} />
 
         <Route element={<ProtectedRoute allowedRoles={["opsuser"]} />}>
           <Route path="/opsuser" element={<CustomersDashboard />} />
