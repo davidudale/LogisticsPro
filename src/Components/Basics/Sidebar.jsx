@@ -13,6 +13,7 @@ import {
   Warehouse,
   Menu,
   X,
+  User,
 } from "lucide-react";
 import { useAuth } from "../Auth/AuthContext.jsx";
 
@@ -43,6 +44,7 @@ const roleLinks = {
   ],
   admin: [
     { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
+    { label: "Customers Management", to: "/admin/customers", icon: User },
     { label: "Order Management", to: "/admin/orders", icon: ClipboardList },
     { label: "Fleet Management", to: "/admin/fleet", icon: Truck },
     { label: "Warehouse", to: "/admin/warehouse", icon: Warehouse },

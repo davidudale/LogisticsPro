@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowBigLeftIcon } from "lucide-react";
+import { toast } from "react-toastify";
 import { useAuth } from "./AuthContext.jsx";
 
 const roleOptions = [
@@ -29,12 +30,16 @@ const Register = () => {
     setError("");
 
     if (form.password.length < 6) {
-      setError("Password must be at least 6 characters long.");
+      const message = "Password must be at least 6 characters long.";
+      setError(message);
+      toast.info(message);
       return;
     }
 
     if (form.password !== form.confirmPassword) {
-      setError("Passwords do not match.");
+      const message = "Passwords do not match.";
+      setError(message);
+      toast.info(message);
       return;
     }
 
@@ -44,9 +49,12 @@ const Register = () => {
         fullName: form.fullName,
       });
       await logout();
+      toast.success("Registration successful. Please check your email for verification.");
       navigate("/login");
     } catch (err) {
-      setError(err?.message || "Registration failed.");
+      const message = err?.message || "Registration failed.";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }

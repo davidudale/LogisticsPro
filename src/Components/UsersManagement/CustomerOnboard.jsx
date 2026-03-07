@@ -6,6 +6,7 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import { app } from "../Auth/firebase";
 import { useAuth } from "../Auth/AuthContext.jsx";
 
@@ -44,11 +45,15 @@ const CustomerOnboard = () => {
     try {
       const normalizedEmail = form.email.trim().toLowerCase();
       if (form.password.length < 6) {
-        setError("Password must be at least 6 characters.");
+        const message = "Password must be at least 6 characters.";
+        setError(message);
+        toast.info(message);
         return;
       }
       if (form.password !== form.confirmPassword) {
-        setError("Passwords do not match.");
+        const message = "Passwords do not match.";
+        setError(message);
+        toast.info(message);
         return;
       }
 
@@ -79,13 +84,17 @@ const CustomerOnboard = () => {
       setSuccess("Customer onboarded successfully.");
       setForm(initialForm);
       await logout();
+      toast.success("Customer onboarded. Verification email has been sent.");
       navigate("/login", { replace: true });
     } catch (submitError) {
       if (submitError?.code === "auth/email-already-in-use") {
+        toast.info("Account already exists. Please login.");
         navigate("/login", { replace: true });
         return;
       }
-      setError(submitError?.message || "Failed to onboard customer.");
+      const message = submitError?.message || "Failed to onboard customer.";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }

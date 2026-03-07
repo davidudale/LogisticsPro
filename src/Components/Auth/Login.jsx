@@ -1,29 +1,62 @@
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowBigLeftIcon, Loader2 } from "lucide-react";
+import { toast } from "react-toastify";
 import { useAuth } from "./AuthContext.jsx";
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, user, loading: authLoading } = useAuth();
+  const { login, resendVerificationEmail, user, loading: authLoading } = useAuth();
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    if (!authLoading && user?.role) {
+    const canEnterDashboard = user?.role && (user?.emailVerified || user?.role === "admin");
+    if (!authLoading && canEnterDashboard) {
       navigate(`/${user.role}`);
     }
-  }, [authLoading, navigate, user?.role]);
+  }, [authLoading, navigate, user?.emailVerified, user?.role]);
 
   const onSubmit = async (event) => {
     event.preventDefault();
     setError("");
+    setNotice("");
     setLoading(true);
     try {
       await login(form.email, form.password);
+      toast.success("Login successful.");
     } catch (err) {
-      setError(err?.message || "Login failed.");
+      const message = err?.message || "Login failed.";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onResendVerification = async () => {
+    setError("");
+    setNotice("");
+
+    if (!form.email || !form.password) {
+      const message = "Enter your email and password, then click resend verification.";
+      setError(message);
+      toast.info(message);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await resendVerificationEmail(form.email, form.password);
+      const message = "Verification email sent. Check your inbox and spam folder.";
+      setNotice(message);
+      toast.success(message);
+    } catch (err) {
+      const message = err?.message || "Could not resend verification email.";
+      setError(message);
+      toast.error(message);
     } finally {
       setLoading(false);
     }
@@ -92,6 +125,7 @@ const Login = () => {
           </div>
 
           {error ? <p className="text-sm text-red-400">{error}</p> : null}
+          {notice ? <p className="text-sm text-emerald-400">{notice}</p> : null}
 
           <button
             type="submit"
@@ -99,6 +133,15 @@ const Login = () => {
             className="w-full flex items-center justify-center px-10 py-2 bg-orange-600 hover:bg-orange-700 text-white font-bold uppercase tracking-widest transition-all hover:shadow-[0_0_20px_rgba(234,88,12,0.4)] rounded-sm disabled:opacity-70 disabled:cursor-not-allowed"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Login"}
+          </button>
+
+          <button
+            type="button"
+            onClick={onResendVerification}
+            disabled={loading}
+            className="w-full px-10 py-2 border border-slate-600 hover:border-slate-500 bg-slate-900/40 text-white font-bold uppercase tracking-widest transition-all rounded-sm disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            Resend Verification Email
           </button>
         </form>
 

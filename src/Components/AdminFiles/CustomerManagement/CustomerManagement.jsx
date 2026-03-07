@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { MessageSquare, Pencil, Plus, Search, Trash2, Truck, Users } from "lucide-react";
 import { toast } from "react-toastify";
 import {
@@ -18,33 +18,33 @@ import { app } from "../../Auth/firebase";
 const db = getFirestore(app);
 
 const COLLECTIONS = {
-  customers: "orders",
-  orders: "order_shipments",
-  support: "order_issues",
+  customers: "customers",
+  orders: "customer_orders",
+  support: "customer_support",
 };
 
 const emptyCustomerForm = {
-  orderNo: "",
-  customerName: "",
-  truckId: "",
-  deliveryAddress: "",
+  companyName: "",
+  contactName: "",
+  email: "",
+  phone: "",
 };
 
 const emptyOrderForm = {
   orderNo: "",
-  truckId: "",
-  location: "",
+  customerName: "",
+  status: "",
   eta: "",
 };
 
 const emptySupportForm = {
-  deliveryNo: "",
-  orderNo: "",
-  confirmation: "",
-  feedback: "",
+  ticketNo: "",
+  customerName: "",
+  topic: "",
+  state: "",
 };
 
-const OrderManagement = () => {
+const CustomerManagement = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState("customers");
@@ -76,10 +76,10 @@ const OrderManagement = () => {
     const value = query.trim().toLowerCase();
     if (!value) return customers;
     return customers.filter(
-      (row) =>
-        row.orderNo.toLowerCase().includes(value) ||
-        row.customerName.toLowerCase().includes(value) ||
-        row.truckId.toLowerCase().includes(value),
+      (customer) =>
+        customer.companyName.toLowerCase().includes(value) ||
+        customer.contactName.toLowerCase().includes(value) ||
+        customer.email.toLowerCase().includes(value),
     );
   }, [customers, query]);
 
@@ -98,10 +98,10 @@ const OrderManagement = () => {
           const data = item.data();
           return {
             id: item.id,
-            orderNo: data.orderNo || "",
-            customerName: data.customerName || data.customer || "",
-            truckId: data.truckId || "",
-            deliveryAddress: data.deliveryAddress || "",
+            companyName: data.companyName || data.company || "",
+            contactName: data.contactName || data.contact || "",
+            email: data.email || "",
+            phone: data.phone || "",
           };
         }),
       );
@@ -112,8 +112,8 @@ const OrderManagement = () => {
           return {
             id: item.id,
             orderNo: data.orderNo || data.id || "",
-            truckId: data.truckId || "",
-            location: data.location || "",
+            customerName: data.customerName || data.customer || "",
+            status: data.status || "Created",
             eta: data.eta || "TBD",
           };
         }),
@@ -124,10 +124,10 @@ const OrderManagement = () => {
           const data = item.data();
           return {
             id: item.id,
-            deliveryNo: data.deliveryNo || data.ticketNo || data.id || "",
-            orderNo: data.orderNo || "",
-            confirmation: data.confirmation || "Pending",
-            feedback: data.feedback || "",
+            ticketNo: data.ticketNo || data.id || "",
+            customerName: data.customerName || data.customer || "",
+            topic: data.topic || "",
+            state: data.state || "Open",
           };
         }),
       );
@@ -146,43 +146,43 @@ const OrderManagement = () => {
 
   const addCustomer = async (event) => {
     event.preventDefault();
-    if (!customerForm.orderNo || !customerForm.customerName || !customerForm.truckId || !customerForm.deliveryAddress) return;
+    if (!customerForm.companyName || !customerForm.contactName || !customerForm.email || !customerForm.phone) return;
     setBusyRow("customer-add");
     try {
       await addDoc(collection(db, COLLECTIONS.customers), {
-        orderNo: customerForm.orderNo.trim(),
-        customerName: customerForm.customerName.trim(),
-        truckId: customerForm.truckId.trim(),
-        deliveryAddress: customerForm.deliveryAddress.trim(),
+        companyName: customerForm.companyName.trim(),
+        contactName: customerForm.contactName.trim(),
+        email: customerForm.email.trim().toLowerCase(),
+        phone: customerForm.phone.trim(),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
       setCustomerForm(emptyCustomerForm);
       await loadCollections();
-      toast.success("Order created and assigned.");
+      toast.success("Customer added successfully.");
     } catch (addError) {
-      toast.error(addError?.message || "Failed to create order assignment.");
+      toast.error(addError?.message || "Failed to add customer.");
     } finally {
       setBusyRow("");
     }
   };
 
   const saveCustomerEdit = async (customerId) => {
-    if (!editCustomer.orderNo || !editCustomer.customerName || !editCustomer.truckId || !editCustomer.deliveryAddress) return;
+    if (!editCustomer.companyName || !editCustomer.contactName || !editCustomer.email || !editCustomer.phone) return;
     setBusyRow(customerId);
     try {
       await updateDoc(doc(db, COLLECTIONS.customers, customerId), {
-        orderNo: editCustomer.orderNo.trim(),
-        customerName: editCustomer.customerName.trim(),
-        truckId: editCustomer.truckId.trim(),
-        deliveryAddress: editCustomer.deliveryAddress.trim(),
+        companyName: editCustomer.companyName.trim(),
+        contactName: editCustomer.contactName.trim(),
+        email: editCustomer.email.trim().toLowerCase(),
+        phone: editCustomer.phone.trim(),
         updatedAt: serverTimestamp(),
       });
       setEditingCustomerId("");
       await loadCollections();
-      toast.success("Order assignment updated.");
+      toast.success("Customer updated successfully.");
     } catch (editError) {
-      toast.error(editError?.message || "Failed to update order assignment.");
+      toast.error(editError?.message || "Failed to update customer.");
     } finally {
       setBusyRow("");
     }
@@ -193,9 +193,9 @@ const OrderManagement = () => {
     try {
       await deleteDoc(doc(db, COLLECTIONS.customers, customerId));
       await loadCollections();
-      toast.success("Order assignment deleted.");
+      toast.success("Customer deleted.");
     } catch (deleteError) {
-      toast.error(deleteError?.message || "Failed to delete order assignment.");
+      toast.error(deleteError?.message || "Failed to delete customer.");
     } finally {
       setBusyRow("");
     }
@@ -203,43 +203,43 @@ const OrderManagement = () => {
 
   const addOrder = async (event) => {
     event.preventDefault();
-    if (!orderForm.orderNo || !orderForm.truckId || !orderForm.location || !orderForm.eta) return;
+    if (!orderForm.orderNo || !orderForm.customerName || !orderForm.status || !orderForm.eta) return;
     setBusyRow("order-add");
     try {
       await addDoc(collection(db, COLLECTIONS.orders), {
         orderNo: orderForm.orderNo.trim(),
-        truckId: orderForm.truckId.trim(),
-        location: orderForm.location.trim(),
+        customerName: orderForm.customerName.trim(),
+        status: orderForm.status.trim(),
         eta: orderForm.eta.trim(),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
       setOrderForm(emptyOrderForm);
       await loadCollections();
-      toast.success("Tracking update added.");
+      toast.success("Order record added.");
     } catch (addError) {
-      toast.error(addError?.message || "Failed to add tracking update.");
+      toast.error(addError?.message || "Failed to add order record.");
     } finally {
       setBusyRow("");
     }
   };
 
   const saveOrderEdit = async (orderId) => {
-    if (!editOrder.orderNo || !editOrder.truckId || !editOrder.location || !editOrder.eta) return;
+    if (!editOrder.orderNo || !editOrder.customerName || !editOrder.status || !editOrder.eta) return;
     setBusyRow(orderId);
     try {
       await updateDoc(doc(db, COLLECTIONS.orders, orderId), {
         orderNo: editOrder.orderNo.trim(),
-        truckId: editOrder.truckId.trim(),
-        location: editOrder.location.trim(),
+        customerName: editOrder.customerName.trim(),
+        status: editOrder.status.trim(),
         eta: editOrder.eta.trim(),
         updatedAt: serverTimestamp(),
       });
       setEditingOrderId("");
       await loadCollections();
-      toast.success("Tracking update saved.");
+      toast.success("Order record updated.");
     } catch (editError) {
-      toast.error(editError?.message || "Failed to update tracking update.");
+      toast.error(editError?.message || "Failed to update order record.");
     } finally {
       setBusyRow("");
     }
@@ -250,9 +250,9 @@ const OrderManagement = () => {
     try {
       await deleteDoc(doc(db, COLLECTIONS.orders, orderId));
       await loadCollections();
-      toast.success("Tracking update deleted.");
+      toast.success("Order record deleted.");
     } catch (deleteError) {
-      toast.error(deleteError?.message || "Failed to delete tracking update.");
+      toast.error(deleteError?.message || "Failed to delete order record.");
     } finally {
       setBusyRow("");
     }
@@ -260,43 +260,43 @@ const OrderManagement = () => {
 
   const addSupport = async (event) => {
     event.preventDefault();
-    if (!supportForm.deliveryNo || !supportForm.orderNo || !supportForm.confirmation || !supportForm.feedback) return;
+    if (!supportForm.ticketNo || !supportForm.customerName || !supportForm.topic || !supportForm.state) return;
     setBusyRow("support-add");
     try {
       await addDoc(collection(db, COLLECTIONS.support), {
-        deliveryNo: supportForm.deliveryNo.trim(),
-        orderNo: supportForm.orderNo.trim(),
-        confirmation: supportForm.confirmation.trim(),
-        feedback: supportForm.feedback.trim(),
+        ticketNo: supportForm.ticketNo.trim(),
+        customerName: supportForm.customerName.trim(),
+        topic: supportForm.topic.trim(),
+        state: supportForm.state.trim(),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
       setSupportForm(emptySupportForm);
       await loadCollections();
-      toast.success("Delivery confirmation captured.");
+      toast.success("Support record added.");
     } catch (addError) {
-      toast.error(addError?.message || "Failed to save delivery confirmation.");
+      toast.error(addError?.message || "Failed to add support record.");
     } finally {
       setBusyRow("");
     }
   };
 
   const saveSupportEdit = async (supportId) => {
-    if (!editSupport.deliveryNo || !editSupport.orderNo || !editSupport.confirmation || !editSupport.feedback) return;
+    if (!editSupport.ticketNo || !editSupport.customerName || !editSupport.topic || !editSupport.state) return;
     setBusyRow(supportId);
     try {
       await updateDoc(doc(db, COLLECTIONS.support, supportId), {
-        deliveryNo: editSupport.deliveryNo.trim(),
-        orderNo: editSupport.orderNo.trim(),
-        confirmation: editSupport.confirmation.trim(),
-        feedback: editSupport.feedback.trim(),
+        ticketNo: editSupport.ticketNo.trim(),
+        customerName: editSupport.customerName.trim(),
+        topic: editSupport.topic.trim(),
+        state: editSupport.state.trim(),
         updatedAt: serverTimestamp(),
       });
       setEditingSupportId("");
       await loadCollections();
-      toast.success("Delivery feedback updated.");
+      toast.success("Support record updated.");
     } catch (editError) {
-      toast.error(editError?.message || "Failed to update delivery feedback.");
+      toast.error(editError?.message || "Failed to update support record.");
     } finally {
       setBusyRow("");
     }
@@ -307,9 +307,9 @@ const OrderManagement = () => {
     try {
       await deleteDoc(doc(db, COLLECTIONS.support, supportId));
       await loadCollections();
-      toast.success("Delivery feedback deleted.");
+      toast.success("Support record deleted.");
     } catch (deleteError) {
-      toast.error(deleteError?.message || "Failed to delete delivery feedback.");
+      toast.error(deleteError?.message || "Failed to delete support record.");
     } finally {
       setBusyRow("");
     }
@@ -317,16 +317,16 @@ const OrderManagement = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-200">
-      <NavBar title="Order Management" onToggleSidebar={() => setSidebarOpen(true)} />
+      <NavBar title="Customer Management" onToggleSidebar={() => setSidebarOpen(true)} />
       <div className="flex flex-1 min-h-screen">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <main className="flex-1 ml-16 lg:ml-64 p-4 lg:p-8 min-h-[calc(100vh-65px)] overflow-y-auto bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-slate-900/50 via-slate-950 to-slate-950">
           <div className="mx-auto max-w-7xl space-y-6">
             <header className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
-              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Order Management</p>
-              <h1 className="mt-2 text-3xl font-bold text-white">Order creation, tracking updates, and delivery confirmation</h1>
+              <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Customer Management</p>
+              <h1 className="mt-2 text-3xl font-bold text-white">Customer onboarding and service operations</h1>
               <p className="mt-2 text-sm text-slate-400">
-                Firestore collections: <span className="text-orange-400">orders</span>, <span className="text-orange-400">order_shipments</span>, and <span className="text-orange-400">order_issues</span>.
+                Firestore collections: <span className="text-orange-400">customers</span>, <span className="text-orange-400">customer_orders</span>, and <span className="text-orange-400">customer_support</span>.
               </p>
               {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
             </header>
@@ -342,7 +342,7 @@ const OrderManagement = () => {
                       : "bg-slate-900/60 text-slate-300 hover:bg-slate-800"
                   }`}
                 >
-                  Order Creation & Truck Assignment
+                  Customer Profiles
                 </button>
                 <button
                   type="button"
@@ -353,7 +353,7 @@ const OrderManagement = () => {
                       : "bg-slate-900/60 text-slate-300 hover:bg-slate-800"
                   }`}
                 >
-                  Real-time Tracking & Updates
+                  Order Tracking
                 </button>
                 <button
                   type="button"
@@ -364,7 +364,7 @@ const OrderManagement = () => {
                       : "bg-slate-900/60 text-slate-300 hover:bg-slate-800"
                   }`}
                 >
-                  Delivery Confirmation & Feedback
+                  Feedback & Support
                 </button>
               </div>
             </div>
@@ -374,7 +374,7 @@ const OrderManagement = () => {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <Users className="text-orange-400" size={18} />
-                    <h2 className="text-lg font-semibold text-white">Order Creation & Truck Assignment</h2>
+                    <h2 className="text-lg font-semibold text-white">Customer Profiles</h2>
                   </div>
                   <button
                     type="button"
@@ -382,21 +382,21 @@ const OrderManagement = () => {
                     className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-700"
                   >
                     <Plus size={14} />
-                    Create Order
+                    Add Customer
                   </button>
                 </div>
               <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-2">
                 <Search size={16} className="text-slate-400" />
-                <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-transparent text-sm text-white outline-none" placeholder="Search order no, customer, or truck id..." />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-transparent text-sm text-white outline-none" placeholder="Search company, contact, or email..." />
               </div>
               <div className="overflow-auto">
                 <table className="w-full min-w-[760px] text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
-                      <th className="px-3 py-2">Order No</th>
-                      <th className="px-3 py-2">Customer</th>
-                      <th className="px-3 py-2">Truck ID</th>
-                      <th className="px-3 py-2">Delivery Address</th>
+                      <th className="px-3 py-2">Company</th>
+                      <th className="px-3 py-2">Contact</th>
+                      <th className="px-3 py-2">Email</th>
+                      <th className="px-3 py-2">Phone</th>
                       <th className="px-3 py-2">Actions</th>
                     </tr>
                   </thead>
@@ -404,29 +404,29 @@ const OrderManagement = () => {
                     {loading ? (
                       <tr><td colSpan={5} className="px-3 py-4 text-slate-500">Loading...</td></tr>
                     ) : filteredCustomers.length === 0 ? (
-                      <tr><td colSpan={5} className="px-3 py-4 text-slate-500">No order records.</td></tr>
+                      <tr><td colSpan={5} className="px-3 py-4 text-slate-500">No customer records.</td></tr>
                     ) : (
                       filteredCustomers.map((row) => (
                         <tr key={row.id} className="border-t border-slate-800">
                           <td className="px-3 py-3">
                             {editingCustomerId === row.id ? (
-                              <input value={editCustomer.orderNo} onChange={(e) => setEditCustomer((p) => ({ ...p, orderNo: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
-                            ) : row.orderNo}
+                              <input value={editCustomer.companyName} onChange={(e) => setEditCustomer((p) => ({ ...p, companyName: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
+                            ) : row.companyName}
                           </td>
                           <td className="px-3 py-3 text-slate-300">
                             {editingCustomerId === row.id ? (
-                              <input value={editCustomer.customerName} onChange={(e) => setEditCustomer((p) => ({ ...p, customerName: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
-                            ) : row.customerName}
+                              <input value={editCustomer.contactName} onChange={(e) => setEditCustomer((p) => ({ ...p, contactName: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
+                            ) : row.contactName}
                           </td>
                           <td className="px-3 py-3 text-slate-400">
                             {editingCustomerId === row.id ? (
-                              <input value={editCustomer.truckId} onChange={(e) => setEditCustomer((p) => ({ ...p, truckId: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
-                            ) : row.truckId}
+                              <input value={editCustomer.email} onChange={(e) => setEditCustomer((p) => ({ ...p, email: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
+                            ) : row.email}
                           </td>
                           <td className="px-3 py-3 text-slate-400">
                             {editingCustomerId === row.id ? (
-                              <input value={editCustomer.deliveryAddress} onChange={(e) => setEditCustomer((p) => ({ ...p, deliveryAddress: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
-                            ) : row.deliveryAddress}
+                              <input value={editCustomer.phone} onChange={(e) => setEditCustomer((p) => ({ ...p, phone: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
+                            ) : row.phone}
                           </td>
                           <td className="px-3 py-3">
                             {editingCustomerId === row.id ? (
@@ -436,7 +436,7 @@ const OrderManagement = () => {
                               </div>
                             ) : (
                               <div className="flex items-center gap-2">
-                                <button type="button" onClick={() => { setEditingCustomerId(row.id); setEditCustomer({ orderNo: row.orderNo, customerName: row.customerName, truckId: row.truckId, deliveryAddress: row.deliveryAddress }); }} className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
+                                <button type="button" onClick={() => { setEditingCustomerId(row.id); setEditCustomer({ companyName: row.companyName, contactName: row.contactName, email: row.email, phone: row.phone }); }} className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
                                   <Pencil size={12} /> Edit
                                 </button>
                                 <button type="button" onClick={() => deleteCustomer(row.id)} disabled={busyRow === row.id} className="inline-flex items-center gap-1 rounded-md border border-rose-500/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10">
@@ -458,7 +458,7 @@ const OrderManagement = () => {
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <Truck className="text-orange-400" size={18} />
-                  <h2 className="text-lg font-semibold text-white">Real-time Tracking & Updates</h2>
+                  <h2 className="text-lg font-semibold text-white">Order Tracking and Updates</h2>
                 </div>
                 <button
                   type="button"
@@ -466,16 +466,16 @@ const OrderManagement = () => {
                   className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-700"
                 >
                   <Plus size={14} />
-                  Add Tracking Update
+                  Add Order
                 </button>
               </div>
               <div className="overflow-auto">
                 <table className="w-full min-w-[700px] text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
-                      <th className="px-3 py-2">Order No</th>
-                      <th className="px-3 py-2">Truck ID</th>
-                      <th className="px-3 py-2">Current Location</th>
+                      <th className="px-3 py-2">Order</th>
+                      <th className="px-3 py-2">Customer</th>
+                      <th className="px-3 py-2">Status</th>
                       <th className="px-3 py-2">ETA</th>
                       <th className="px-3 py-2">Actions</th>
                     </tr>
@@ -490,13 +490,13 @@ const OrderManagement = () => {
                         </td>
                         <td className="px-3 py-3 text-slate-300">
                           {editingOrderId === row.id ? (
-                            <input value={editOrder.truckId} onChange={(e) => setEditOrder((p) => ({ ...p, truckId: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
-                          ) : row.truckId}
+                            <input value={editOrder.customerName} onChange={(e) => setEditOrder((p) => ({ ...p, customerName: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
+                          ) : row.customerName}
                         </td>
                         <td className="px-3 py-3 text-slate-300">
                           {editingOrderId === row.id ? (
-                            <input value={editOrder.location} onChange={(e) => setEditOrder((p) => ({ ...p, location: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
-                          ) : row.location}
+                            <input value={editOrder.status} onChange={(e) => setEditOrder((p) => ({ ...p, status: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
+                          ) : row.status}
                         </td>
                         <td className="px-3 py-3 text-slate-400">
                           {editingOrderId === row.id ? (
@@ -511,7 +511,7 @@ const OrderManagement = () => {
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <button type="button" onClick={() => { setEditingOrderId(row.id); setEditOrder({ orderNo: row.orderNo, truckId: row.truckId, location: row.location, eta: row.eta }); }} className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
+                              <button type="button" onClick={() => { setEditingOrderId(row.id); setEditOrder({ orderNo: row.orderNo, customerName: row.customerName, status: row.status, eta: row.eta }); }} className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
                                 <Pencil size={12} /> Edit
                               </button>
                               <button type="button" onClick={() => deleteOrder(row.id)} disabled={busyRow === row.id} className="inline-flex items-center gap-1 rounded-md border border-rose-500/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10">
@@ -533,7 +533,7 @@ const OrderManagement = () => {
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <MessageSquare className="text-orange-400" size={18} />
-                  <h2 className="text-lg font-semibold text-white">Delivery Confirmation and Feedback</h2>
+                  <h2 className="text-lg font-semibold text-white">Feedback and Support</h2>
                 </div>
                 <button
                   type="button"
@@ -541,17 +541,17 @@ const OrderManagement = () => {
                   className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-700"
                 >
                   <Plus size={14} />
-                  Add Confirmation
+                  Add Ticket
                 </button>
               </div>
               <div className="overflow-auto">
                 <table className="w-full min-w-[700px] text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
-                      <th className="px-3 py-2">Delivery No</th>
-                      <th className="px-3 py-2">Order No</th>
-                      <th className="px-3 py-2">Confirmation</th>
-                      <th className="px-3 py-2">Feedback</th>
+                      <th className="px-3 py-2">Ticket</th>
+                      <th className="px-3 py-2">Customer</th>
+                      <th className="px-3 py-2">Topic</th>
+                      <th className="px-3 py-2">State</th>
                       <th className="px-3 py-2">Actions</th>
                     </tr>
                   </thead>
@@ -560,23 +560,23 @@ const OrderManagement = () => {
                         <tr key={row.id} className="border-t border-slate-800">
                           <td className="px-3 py-3 text-white">
                             {editingSupportId === row.id ? (
-                              <input value={editSupport.deliveryNo} onChange={(e) => setEditSupport((p) => ({ ...p, deliveryNo: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
-                            ) : row.deliveryNo}
+                              <input value={editSupport.ticketNo} onChange={(e) => setEditSupport((p) => ({ ...p, ticketNo: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
+                            ) : row.ticketNo}
                           </td>
                           <td className="px-3 py-3 text-slate-300">
                             {editingSupportId === row.id ? (
-                              <input value={editSupport.orderNo} onChange={(e) => setEditSupport((p) => ({ ...p, orderNo: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
-                            ) : row.orderNo}
+                              <input value={editSupport.customerName} onChange={(e) => setEditSupport((p) => ({ ...p, customerName: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
+                            ) : row.customerName}
                           </td>
                           <td className="px-3 py-3 text-slate-300">
                             {editingSupportId === row.id ? (
-                              <input value={editSupport.confirmation} onChange={(e) => setEditSupport((p) => ({ ...p, confirmation: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
-                            ) : row.confirmation}
+                              <input value={editSupport.topic} onChange={(e) => setEditSupport((p) => ({ ...p, topic: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
+                            ) : row.topic}
                           </td>
                           <td className="px-3 py-3 text-slate-400">
                             {editingSupportId === row.id ? (
-                              <input value={editSupport.feedback} onChange={(e) => setEditSupport((p) => ({ ...p, feedback: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
-                            ) : row.feedback}
+                              <input value={editSupport.state} onChange={(e) => setEditSupport((p) => ({ ...p, state: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
+                            ) : row.state}
                           </td>
                           <td className="px-3 py-3">
                             {editingSupportId === row.id ? (
@@ -586,7 +586,7 @@ const OrderManagement = () => {
                               </div>
                             ) : (
                               <div className="flex items-center gap-2">
-                                <button type="button" onClick={() => { setEditingSupportId(row.id); setEditSupport({ deliveryNo: row.deliveryNo, orderNo: row.orderNo, confirmation: row.confirmation, feedback: row.feedback }); }} className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
+                                <button type="button" onClick={() => { setEditingSupportId(row.id); setEditSupport({ ticketNo: row.ticketNo, customerName: row.customerName, topic: row.topic, state: row.state }); }} className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
                                   <Pencil size={12} /> Edit
                                 </button>
                                 <button type="button" onClick={() => deleteSupport(row.id)} disabled={busyRow === row.id} className="inline-flex items-center gap-1 rounded-md border border-rose-500/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10">
@@ -607,7 +607,7 @@ const OrderManagement = () => {
               <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
                 <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-white">Create Order</h3>
+                    <h3 className="text-lg font-semibold text-white">Add Customer</h3>
                     <button type="button" onClick={() => setIsCustomerModalOpen(false)} className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800">Close</button>
                   </div>
                   <form
@@ -617,12 +617,12 @@ const OrderManagement = () => {
                     }}
                     className="mt-4 grid gap-3 sm:grid-cols-2"
                   >
-                    <input value={customerForm.orderNo} onChange={(e) => setCustomerForm((p) => ({ ...p, orderNo: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Order No" required />
-                    <input value={customerForm.customerName} onChange={(e) => setCustomerForm((p) => ({ ...p, customerName: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Customer Name" required />
-                    <input value={customerForm.truckId} onChange={(e) => setCustomerForm((p) => ({ ...p, truckId: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Assigned Truck ID" required />
-                    <input value={customerForm.deliveryAddress} onChange={(e) => setCustomerForm((p) => ({ ...p, deliveryAddress: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Delivery Address" required />
+                    <input value={customerForm.companyName} onChange={(e) => setCustomerForm((p) => ({ ...p, companyName: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Company" required />
+                    <input value={customerForm.contactName} onChange={(e) => setCustomerForm((p) => ({ ...p, contactName: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Contact" required />
+                    <input type="email" value={customerForm.email} onChange={(e) => setCustomerForm((p) => ({ ...p, email: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Email" required />
+                    <input value={customerForm.phone} onChange={(e) => setCustomerForm((p) => ({ ...p, phone: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Phone" required />
                     <button type="submit" disabled={busyRow === "customer-add"} className="sm:col-span-2 rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-70">
-                      {busyRow === "customer-add" ? "Adding..." : "Create Order"}
+                      {busyRow === "customer-add" ? "Adding..." : "Add Customer"}
                     </button>
                   </form>
                 </div>
@@ -633,7 +633,7 @@ const OrderManagement = () => {
               <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
                 <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-white">Add Tracking Update</h3>
+                    <h3 className="text-lg font-semibold text-white">Add Order</h3>
                     <button type="button" onClick={() => setIsOrderModalOpen(false)} className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800">Close</button>
                   </div>
                   <form
@@ -644,11 +644,11 @@ const OrderManagement = () => {
                     className="mt-4 grid gap-3 sm:grid-cols-2"
                   >
                     <input value={orderForm.orderNo} onChange={(e) => setOrderForm((p) => ({ ...p, orderNo: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Order No" required />
-                    <input value={orderForm.truckId} onChange={(e) => setOrderForm((p) => ({ ...p, truckId: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Truck ID" required />
-                    <input value={orderForm.location} onChange={(e) => setOrderForm((p) => ({ ...p, location: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Current Location" required />
+                    <input value={orderForm.customerName} onChange={(e) => setOrderForm((p) => ({ ...p, customerName: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Customer" required />
+                    <input value={orderForm.status} onChange={(e) => setOrderForm((p) => ({ ...p, status: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Status" required />
                     <input value={orderForm.eta} onChange={(e) => setOrderForm((p) => ({ ...p, eta: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="ETA" required />
                     <button type="submit" disabled={busyRow === "order-add"} className="sm:col-span-2 rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-70">
-                      {busyRow === "order-add" ? "Adding..." : "Add Tracking Update"}
+                      {busyRow === "order-add" ? "Adding..." : "Add Order"}
                     </button>
                   </form>
                 </div>
@@ -659,7 +659,7 @@ const OrderManagement = () => {
               <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
                 <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-white">Add Delivery Confirmation</h3>
+                    <h3 className="text-lg font-semibold text-white">Add Support Ticket</h3>
                     <button type="button" onClick={() => setIsSupportModalOpen(false)} className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800">Close</button>
                   </div>
                   <form
@@ -669,12 +669,12 @@ const OrderManagement = () => {
                     }}
                     className="mt-4 grid gap-3 sm:grid-cols-2"
                   >
-                    <input value={supportForm.deliveryNo} onChange={(e) => setSupportForm((p) => ({ ...p, deliveryNo: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Delivery No" required />
-                    <input value={supportForm.orderNo} onChange={(e) => setSupportForm((p) => ({ ...p, orderNo: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Order No" required />
-                    <input value={supportForm.confirmation} onChange={(e) => setSupportForm((p) => ({ ...p, confirmation: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Confirmation Status" required />
-                    <input value={supportForm.feedback} onChange={(e) => setSupportForm((p) => ({ ...p, feedback: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Customer Feedback" required />
+                    <input value={supportForm.ticketNo} onChange={(e) => setSupportForm((p) => ({ ...p, ticketNo: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Ticket No" required />
+                    <input value={supportForm.customerName} onChange={(e) => setSupportForm((p) => ({ ...p, customerName: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Customer" required />
+                    <input value={supportForm.topic} onChange={(e) => setSupportForm((p) => ({ ...p, topic: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="Topic" required />
+                    <input value={supportForm.state} onChange={(e) => setSupportForm((p) => ({ ...p, state: e.target.value }))} className="rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500" placeholder="State" required />
                     <button type="submit" disabled={busyRow === "support-add"} className="sm:col-span-2 rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-70">
-                      {busyRow === "support-add" ? "Adding..." : "Add Confirmation"}
+                      {busyRow === "support-add" ? "Adding..." : "Add Ticket"}
                     </button>
                   </form>
                 </div>
@@ -687,6 +687,4 @@ const OrderManagement = () => {
   );
 };
 
-export default OrderManagement;
-
-
+export default CustomerManagement;

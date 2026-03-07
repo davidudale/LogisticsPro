@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   createUserWithEmailAndPassword,
   getIdTokenResult,
@@ -40,11 +40,16 @@ const normalizeRole = (value) => {
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
+  const resetTimerRef = useRef(null);
+  const inactivityLimitMs = 15 * 60 * 1000;
+  const warningOffsetMs = 1 * 60 * 1000;
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (!currentUser) {
         setUser(null);
+        setShowTimeoutWarning(false);
         setLoading(false);
         return;
       }
@@ -59,6 +64,18 @@ export const AuthProvider = ({ children }) => {
         const resolvedRole = normalizeRole(
           profile.role || tokenResult?.claims?.role,
         );
+
+        if (!currentUser.emailVerified && resolvedRole !== ROLE.ADMIN) {
+          try {
+            await signOut(auth);
+          } catch (error) {
+            console.error("Failed to sign out unverified user:", error);
+          }
+          setUser(null);
+          setShowTimeoutWarning(false);
+          setLoading(false);
+          return;
+        }
 
         setUser({
           uid: currentUser.uid,
@@ -94,6 +111,53 @@ export const AuthProvider = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    let timeoutId = null;
+    let warningId = null;
+    const events = ["mousemove", "mousedown", "keydown", "touchstart", "scroll"];
+
+    const resetTimer = () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (warningId) {
+        clearTimeout(warningId);
+      }
+      if (showTimeoutWarning) {
+        setShowTimeoutWarning(false);
+      }
+
+      warningId = setTimeout(() => {
+        setShowTimeoutWarning(true);
+      }, Math.max(0, inactivityLimitMs - warningOffsetMs));
+
+      timeoutId = setTimeout(async () => {
+        await signOut(auth);
+        setUser(null);
+      }, inactivityLimitMs);
+    };
+
+    resetTimerRef.current = resetTimer;
+    events.forEach((event) =>
+      window.addEventListener(event, resetTimer, { passive: true }),
+    );
+    resetTimer();
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      if (warningId) {
+        clearTimeout(warningId);
+      }
+      events.forEach((event) => window.removeEventListener(event, resetTimer));
+    };
+  }, [user, inactivityLimitMs, warningOffsetMs, showTimeoutWarning]);
+
   const value = useMemo(
     () => ({
       user,
@@ -120,8 +184,23 @@ export const AuthProvider = ({ children }) => {
         }
         return credential;
       },
-      login: (email, password) =>
-        signInWithEmailAndPassword(auth, email, password),
+      login: async (email, password) => {
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        const profileSnap = await getDoc(doc(db, "users", credential.user.uid));
+        const profile = profileSnap.exists() ? profileSnap.data() : {};
+        const resolvedRole = normalizeRole(profile.role);
+
+        if (!credential.user.emailVerified && resolvedRole !== ROLE.ADMIN) {
+          await signOut(auth);
+          throw new Error("Verify your email before logging in.");
+        }
+        return credential;
+      },
+      resendVerificationEmail: async (email, password) => {
+        const credential = await signInWithEmailAndPassword(auth, email, password);
+        await sendEmailVerification(credential.user);
+        await signOut(auth);
+      },
       logout: () => signOut(auth),
       hasRole: (role) => normalizeRole(user?.role) === normalizeRole(role),
       isAdmin: normalizeRole(user?.role) === ROLE.ADMIN,
@@ -133,7 +212,32 @@ export const AuthProvider = ({ children }) => {
     [user, loading],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {showTimeoutWarning && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
+          <div className="w-full max-w-md mx-4 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+            <h2 className="text-lg font-semibold text-white">
+              Session expiring soon
+            </h2>
+            <p className="mt-2 text-sm text-slate-300">
+              You will be signed out in 1 minute due to inactivity.
+            </p>
+            <div className="mt-5 flex items-center justify-end gap-3">
+              <button
+                onClick={() => resetTimerRef.current && resetTimerRef.current()}
+                className="px-4 py-2 text-sm font-semibold text-white rounded-lg bg-orange-600 hover:bg-orange-500 transition-colors"
+                type="button"
+              >
+                Stay signed in
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {!loading && children}
+    </AuthContext.Provider>
+  );
 };
 
 export const useAuth = () => {
