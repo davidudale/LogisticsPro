@@ -5,8 +5,9 @@
   --inspectpro-accent: #f97316;
 }
 
+
 html {
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  font-family: 'Bahnschrift Condensed', sans-serif;
   scroll-behavior: smooth;
 }
 

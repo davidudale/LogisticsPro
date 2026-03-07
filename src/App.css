@@ -4,6 +4,10 @@
   --inspectpro-accent: #f97316;
 }
 
+body {
+  font-family: 'Bahnschrift Condensed', sans-serif;
+}
+
 ::selection {
   background: var(--inspectpro-accent);
   color: white;
