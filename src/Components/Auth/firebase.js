@@ -1,16 +1,19 @@
-import { initializeApp } from "firebase/app";
+import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBSlW6pPC-23ZJmaaZIcBqr1yj-kDCBZfQ",
-  authDomain: "logisticpro.firebaseapp.com",
-  projectId: "logisticpro",
-  storageBucket: "logisticpro.firebasestorage.app",
-  messagingSenderId: "466738042816",
-  appId: "1:466738042816:web:44f206934392528ec5da25",
+  apiKey: "AIzaSyAbST49HHwBKjDBZpcGq8aUIVuPAixtqP0",
+  authDomain: "logisticspro-4a270.firebaseapp.com",
+  projectId: "logisticspro-4a270",
+  storageBucket: "logisticspro-4a270.firebasestorage.app",
+  messagingSenderId: "547448964896",
+  appId: "1:547448964896:web:d3a6efc22a27361490b945"
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const secondaryApp = getApps().find(({ name }) => name === "secondary-auth")
+  || initializeApp(firebaseConfig, "secondary-auth");
 const auth = getAuth(app);
+const secondaryAuth = getAuth(secondaryApp);
 
-export { app, auth };
+export { app, auth, secondaryAuth };

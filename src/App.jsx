@@ -16,6 +16,8 @@ import FleetManagement from "./Components/AdminFiles/FleetManagement/FleetManage
 import CustomerOnboard from "./Components/UsersManagement/CustomerOnboard.jsx";
 import CustomerRegistration from "./Components/UsersManagement/CustomerRegistration.jsx";
 import CustomerManagement from "./Components/AdminFiles/CustomerManagement/CustomerManagement.jsx";
+import CustomersShipment from "./Components/Customers/CustomersShipment.jsx";
+import PendingQuotations from "./Components/AdminFiles/CustomerManagement/PendingQuotations.jsx";
 
 const App = () => {
   return (
@@ -29,6 +31,7 @@ const App = () => {
 
         <Route element={<ProtectedRoute allowedRoles={["opsuser"]} />}>
           <Route path="/opsuser" element={<CustomersDashboard />} />
+          <Route path="/opsuser/shipments" element={<CustomersShipment />} />
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["opsmanager"]} />}>
           <Route path="/opsmanager" element={<StaffDashboard />} />
@@ -43,6 +46,10 @@ const App = () => {
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route path="/admin" element={<AdminDashboard />} />
         </Route>
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin/pendingQuotation" element={<PendingQuotations />} />
+        </Route>
+        
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route path="/admin/orders" element={<OrderManagement />} />
         </Route>

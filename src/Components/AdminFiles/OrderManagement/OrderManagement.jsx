@@ -18,9 +18,14 @@ import { app } from "../../Auth/firebase";
 const db = getFirestore(app);
 
 const COLLECTIONS = {
-  customers: "orders",
+  customers: "customer_order",
   orders: "order_shipments",
   support: "order_issues",
+};
+
+const formatLocation = (location) => {
+  if (!location || typeof location !== "object") return "Not available";
+  return [location.address, location.lga, location.state, location.country].filter(Boolean).join(", ");
 };
 
 const emptyCustomerForm = {
@@ -79,7 +84,8 @@ const OrderManagement = () => {
       (row) =>
         row.orderNo.toLowerCase().includes(value) ||
         row.customerName.toLowerCase().includes(value) ||
-        row.truckId.toLowerCase().includes(value),
+        row.cargo.toLowerCase().includes(value) ||
+        row.status.toLowerCase().includes(value),
     );
   }, [customers, query]);
 
@@ -101,7 +107,12 @@ const OrderManagement = () => {
             orderNo: data.orderNo || "",
             customerName: data.customerName || data.customer || "",
             truckId: data.truckId || "",
-            deliveryAddress: data.deliveryAddress || "",
+            cargo: data.cargo || "",
+            weight: data.weight || "",
+            status: data.status || "Created",
+            origin: formatLocation(data.origin),
+            destination: formatLocation(data.destination),
+            deliveryAddress: data.deliveryAddress || formatLocation(data.destination),
           };
         }),
       );
@@ -326,7 +337,7 @@ const OrderManagement = () => {
               <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Order Management</p>
               <h1 className="mt-2 text-3xl font-bold text-white">Order creation, tracking updates, and delivery confirmation</h1>
               <p className="mt-2 text-sm text-slate-400">
-                Firestore collections: <span className="text-orange-400">orders</span>, <span className="text-orange-400">order_shipments</span>, and <span className="text-orange-400">order_issues</span>.
+                Firestore collections: <span className="text-orange-400">customer_order</span>, <span className="text-orange-400">order_shipments</span>, and <span className="text-orange-400">order_issues</span>.
               </p>
               {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
             </header>
@@ -374,76 +385,48 @@ const OrderManagement = () => {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <Users className="text-orange-400" size={18} />
-                    <h2 className="text-lg font-semibold text-white">Order Creation & Truck Assignment</h2>
+                    <h2 className="text-lg font-semibold text-white">Customer Shipment Orders</h2>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsCustomerModalOpen(true)}
-                    className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-700"
-                  >
-                    <Plus size={14} />
-                    Create Order
-                  </button>
                 </div>
               <div className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-2">
                 <Search size={16} className="text-slate-400" />
-                <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-transparent text-sm text-white outline-none" placeholder="Search order no, customer, or truck id..." />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-transparent text-sm text-white outline-none" placeholder="Search order no, customer, cargo, or status..." />
               </div>
               <div className="overflow-auto">
-                <table className="w-full min-w-[760px] text-sm">
+                <table className="w-full min-w-[1200px] text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                       <th className="px-3 py-2">Order No</th>
                       <th className="px-3 py-2">Customer</th>
-                      <th className="px-3 py-2">Truck ID</th>
-                      <th className="px-3 py-2">Delivery Address</th>
+                      <th className="px-3 py-2">Cargo</th>
+                      <th className="px-3 py-2">Weight</th>
+                      <th className="px-3 py-2">Origin</th>
+                      <th className="px-3 py-2">Destination</th>
+                      <th className="px-3 py-2">Status</th>
                       <th className="px-3 py-2">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan={5} className="px-3 py-4 text-slate-500">Loading...</td></tr>
+                      <tr><td colSpan={8} className="px-3 py-4 text-slate-500">Loading...</td></tr>
                     ) : filteredCustomers.length === 0 ? (
-                      <tr><td colSpan={5} className="px-3 py-4 text-slate-500">No order records.</td></tr>
+                      <tr><td colSpan={8} className="px-3 py-4 text-slate-500">No shipment orders.</td></tr>
                     ) : (
                       filteredCustomers.map((row) => (
                         <tr key={row.id} className="border-t border-slate-800">
+                          <td className="px-3 py-3 text-white">{row.orderNo}</td>
+                          <td className="px-3 py-3 text-slate-300">{row.customerName}</td>
+                          <td className="px-3 py-3 text-slate-300">{row.cargo || "Not specified"}</td>
+                          <td className="px-3 py-3 text-slate-400">{row.weight || "Not specified"}</td>
+                          <td className="px-3 py-3 text-slate-400">{row.origin}</td>
+                          <td className="px-3 py-3 text-slate-400">{row.destination}</td>
+                          <td className="px-3 py-3 text-slate-300">{row.status}</td>
                           <td className="px-3 py-3">
-                            {editingCustomerId === row.id ? (
-                              <input value={editCustomer.orderNo} onChange={(e) => setEditCustomer((p) => ({ ...p, orderNo: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
-                            ) : row.orderNo}
-                          </td>
-                          <td className="px-3 py-3 text-slate-300">
-                            {editingCustomerId === row.id ? (
-                              <input value={editCustomer.customerName} onChange={(e) => setEditCustomer((p) => ({ ...p, customerName: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
-                            ) : row.customerName}
-                          </td>
-                          <td className="px-3 py-3 text-slate-400">
-                            {editingCustomerId === row.id ? (
-                              <input value={editCustomer.truckId} onChange={(e) => setEditCustomer((p) => ({ ...p, truckId: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
-                            ) : row.truckId}
-                          </td>
-                          <td className="px-3 py-3 text-slate-400">
-                            {editingCustomerId === row.id ? (
-                              <input value={editCustomer.deliveryAddress} onChange={(e) => setEditCustomer((p) => ({ ...p, deliveryAddress: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
-                            ) : row.deliveryAddress}
-                          </td>
-                          <td className="px-3 py-3">
-                            {editingCustomerId === row.id ? (
-                              <div className="flex items-center gap-2">
-                                <button type="button" onClick={() => saveCustomerEdit(row.id)} disabled={busyRow === row.id} className="rounded-md bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700">Save</button>
-                                <button type="button" onClick={() => setEditingCustomerId("")} className="rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">Cancel</button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2">
-                                <button type="button" onClick={() => { setEditingCustomerId(row.id); setEditCustomer({ orderNo: row.orderNo, customerName: row.customerName, truckId: row.truckId, deliveryAddress: row.deliveryAddress }); }} className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-200 hover:bg-slate-800">
-                                  <Pencil size={12} /> Edit
-                                </button>
-                                <button type="button" onClick={() => deleteCustomer(row.id)} disabled={busyRow === row.id} className="inline-flex items-center gap-1 rounded-md border border-rose-500/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10">
-                                  <Trash2 size={12} /> Delete
-                                </button>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={() => deleteCustomer(row.id)} disabled={busyRow === row.id} className="inline-flex items-center gap-1 rounded-md border border-rose-500/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10">
+                                <Trash2 size={12} /> Delete
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       )))}

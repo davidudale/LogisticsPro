@@ -1,5 +1,6 @@
 import React from "react";
 
+// Service cards are data-driven so the section can scale without changing layout markup.
 const services = [
   {
     title: "Dispatch + Routing",
@@ -44,6 +45,7 @@ const Services = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5 sm:gap-6">
+          {/* Each card uses image-first storytelling with copy anchored to the bottom overlay. */}
           {services.map((service) => (
             <article
               key={service.title}

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../Auth/AuthContext.jsx";
 
+// Keeps role-to-dashboard routing in one place for both desktop and mobile actions.
 const getDashboardPathByRole = (role) => {
   if (role === "admin") return "/admin";
   if (role === "opsmanager") return "/opsmanager";
@@ -15,6 +16,7 @@ const LandingNavbar = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
+  // These are currently anchor placeholders for future in-page navigation targets.
   const navLinks = [
     { name: "Track", href: "#Track" },
     { name: "Ship", href: "#Ship" },
@@ -24,6 +26,7 @@ const LandingNavbar = () => {
   const userLabel = user?.displayName || user?.email?.split("@")[0] || "Account";
 
   const handleAccountAction = () => {
+    // Signed-in users go straight to their role dashboard; everyone else is sent to login.
     if (user?.role) {
       navigate(getDashboardPathByRole(user.role));
       return;
@@ -103,6 +106,7 @@ const LandingNavbar = () => {
       </div>
 
       {mobileMenuOpen && (
+        // The mobile menu reuses the same actions as desktop to keep behavior consistent.
         <div className="md:hidden mt-3 max-w-7xl mx-auto rounded-2xl border border-slate-700/60 bg-slate-950/90 backdrop-blur-xl">
           <div className="px-4 pt-2 pb-5 space-y-1">
             {navLinks.map((link) => (

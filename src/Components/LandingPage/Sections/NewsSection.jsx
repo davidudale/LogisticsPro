@@ -1,5 +1,6 @@
 import React from "react";
 
+// Content is framed as product trust signals rather than a traditional blog/news feed.
 const news = [
   {
     category: "Compliance",
@@ -38,6 +39,7 @@ const NewsSection = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+          {/* Reusable cards make it easy to swap these highlights for live CMS data later. */}
           {news.map((item) => (
             <article key={item.title} className="group cursor-pointer rounded-2xl border border-slate-800 bg-slate-900/35 p-4 sm:p-5 hover:border-slate-700 transition-colors">
               <div className="relative overflow-hidden mb-5 rounded-xl aspect-video">

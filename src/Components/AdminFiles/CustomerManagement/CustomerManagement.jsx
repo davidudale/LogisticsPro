@@ -397,9 +397,9 @@ const CustomerManagement = () => {
           <div className="mx-auto max-w-7xl space-y-6">
             <header className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Customer Management</p>
-              <h1 className="mt-2 text-3xl font-bold text-white">Customer onboarding and service operations</h1>
+              <h1 className="mt-2 text-3xl font-bold text-white">Customer Onboarding & Service Operations</h1>
               <p className="mt-2 text-sm text-slate-400">
-                Firestore collections: <span className="text-orange-400">customers</span>, <span className="text-orange-400">customer_orders</span>, and <span className="text-orange-400">customer_support</span>.
+                <span className="text-orange-400">customers</span>, <span className="text-orange-400">customer_orders</span>, and <span className="text-orange-400">customer_support</span>.
               </p>
               {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
             </header>

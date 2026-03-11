@@ -1,7 +1,8 @@
 import React from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import {
   ClipboardList,
+  ChevronDown,
   FileText,
   LayoutDashboard,
   MapPin,
@@ -17,6 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../Auth/AuthContext.jsx";
 
+// Central role-to-navigation map used to render a different sidebar for each user type.
 const roleLinks = {
   opsuser: [
     { label: "Dashboard", to: "/opsuser", icon: LayoutDashboard },
@@ -44,28 +46,167 @@ const roleLinks = {
   ],
   admin: [
     { label: "Dashboard", to: "/admin", icon: LayoutDashboard },
-    { label: "Customers Management", to: "/admin/customers", icon: User },
-    { label: "Order Management", to: "/admin/orders", icon: ClipboardList },
-    { label: "Fleet Management", to: "/admin/fleet", icon: Truck },
-    { label: "Warehouse", to: "/admin/warehouse", icon: Warehouse },
-    { label: "Reports", to: "/admin/reports", icon: FileText },
-    { label: "Users", to: "/admin/users", icon: Users },
-    { label: "Settings", to: "/admin/settings", icon: Settings },
+    {
+      label: "Operations",
+      icon: ClipboardList,
+      children: [
+        {
+          label: "Order Management",
+          icon: ClipboardList,
+          children: [
+            { label: "Shipment Orders", to: "/admin/orders", icon: ClipboardList },
+            { label: "Pending Quotations", to: "/admin/pendingQuotation", icon: ClipboardList },
+          ],
+        },
+        { label: "Customers Management", to: "/admin/customers", icon: User },
+        { label: "Accounts", to: "/admin/account", icon: FileText },
+        
+        { label: "Reports", to: "/admin/reports", icon: FileText },
+      ],
+    },
+
+    {
+      label: "System Setup",
+      icon: Settings,
+      children: [
+        { label: "Users Management", to: "/admin/users", icon: Users },
+        { label: "Fleet Management", to: "/admin/fleet", icon: Truck },
+        { label: "Drivers Management", to: "/admin/driver", icon: Users },
+        { label: "Warehouse", to: "/admin/warehouse", icon: Warehouse },
+        { label: "Settings", to: "/admin/settings", icon: Settings },
+      ],
+    },
+    {
+      label: "Audit",
+      icon: ClipboardList,
+      children: [
+        { label: "Audit Trail", to: "/admin/audit", icon: ClipboardList },
+
+      ],
+    },
   ],
 };
 
 const Sidebar = ({ open = false, onClose }) => {
   const { user } = useAuth();
+  const location = useLocation();
   const [isMobileExpanded, setIsMobileExpanded] = React.useState(false);
   const links = roleLinks[user?.role] || [];
   const userLabel =
     user?.displayName || user?.email?.split("@")[0] || user?.role || "User";
+  const [expandedGroups, setExpandedGroups] = React.useState({
+    Operations: true,
+    Management: true,
+    Insights: true,
+    System: true,
+  });
 
   React.useEffect(() => {
+    // Keeps the sidebar expanded whenever the parent asks to open it on small screens.
     if (open) {
       setIsMobileExpanded(true);
     }
   }, [open]);
+
+  React.useEffect(() => {
+    const hasActiveChild = (item) =>
+      item.children?.some((child) =>
+        child.to
+          ? location.pathname === child.to || location.pathname.startsWith(`${child.to}/`)
+          : hasActiveChild(child),
+      );
+
+    const activeGroup = links.find(
+      (item) => item.children && hasActiveChild(item),
+    );
+
+    if (activeGroup) {
+      setExpandedGroups((prev) => ({ ...prev, [activeGroup.label]: true }));
+    }
+  }, [links, location.pathname]);
+
+  const toggleGroup = (label) => {
+    setExpandedGroups((prev) => ({ ...prev, [label]: !prev[label] }));
+  };
+
+  const renderLink = (item, nested = false, depth = 0) => {
+    const Icon = item.icon;
+    const nestedSpacingClass = depth > 1 ? "ml-5 pl-4 text-[13px]" : "ml-3 pl-4 text-[13px]";
+
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        className={({ isActive }) =>
+          `flex items-center gap-3 rounded-xl p-3 text-sm font-semibold transition-all group ${
+            nested ? nestedSpacingClass : ""
+          } ${
+            isActive
+              ? "bg-orange-600/10 text-orange-500"
+              : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
+          }`
+        }
+        onClick={onClose}
+      >
+        <Icon size={nested ? 16 : 18} />
+        <span className={`${isMobileExpanded ? "block" : "hidden"} lg:block`}>
+          {item.label}
+        </span>
+      </NavLink>
+    );
+  };
+
+  const renderItem = (item, depth = 0) => {
+    if (!item.children) {
+      return renderLink(item, depth > 0, depth);
+    }
+
+    const hasActiveChild = (entry) =>
+      entry.children?.some((child) =>
+        child.to
+          ? location.pathname === child.to || location.pathname.startsWith(`${child.to}/`)
+          : hasActiveChild(child),
+      );
+
+    const isExpanded = expandedGroups[item.label] ?? true;
+    const isGroupActive = hasActiveChild(item);
+    const Icon = item.icon;
+
+    return (
+      <div key={item.label} className="space-y-1">
+        <button
+          type="button"
+          onClick={() => toggleGroup(item.label)}
+          className={`w-full flex items-center gap-3 rounded-xl p-3 text-sm font-semibold transition-all ${
+            depth > 0 ? "ml-3" : ""
+          } ${
+            isGroupActive
+              ? "bg-slate-800/70 text-white"
+              : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
+          }`}
+        >
+          <Icon size={18} />
+          <span
+            className={`${isMobileExpanded ? "block" : "hidden"} lg:block flex-1 text-left`}
+          >
+            {item.label}
+          </span>
+          <ChevronDown
+            size={16}
+            className={`${isMobileExpanded ? "block" : "hidden"} lg:block transition-transform ${
+              isExpanded ? "rotate-180" : ""
+            }`}
+          />
+        </button>
+
+        {isExpanded && (
+          <div className="space-y-1">
+            {item.children.map((child) => renderItem(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -77,6 +218,7 @@ const Sidebar = ({ open = false, onClose }) => {
         <div className="p-4 lg:p-6 border-b border-slate-800/50">
           <div className="flex items-center gap-4">
             <div className="relative shrink-0">
+              {/* Mobile users can collapse the sidebar to an icon rail without affecting desktop. */}
               <button
                 type="button"
                 onClick={() => {
@@ -109,28 +251,8 @@ const Sidebar = ({ open = false, onClose }) => {
         </div>
 
         <nav className="flex-1 bg-slate-900 overflow-y-auto py-4 px-3 space-y-1">
-          {links.map((item) => {
-            const Icon = item.icon;
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 rounded-xl p-3 text-sm font-semibold transition-all group ${
-                    isActive
-                      ? "bg-orange-600/10 text-orange-500"
-                      : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
-                  }`
-                }
-                onClick={onClose}
-              >
-                <Icon size={18} />
-                <span className={`${isMobileExpanded ? "block" : "hidden"} lg:block`}>
-                  {item.label}
-                </span>
-              </NavLink>
-            );
-          })}
+          {/* NavLink handles active-route styling so each role section stays declarative. */}
+          {links.map((item) => renderItem(item))}
         </nav>
       </aside>
 
@@ -139,6 +261,7 @@ const Sidebar = ({ open = false, onClose }) => {
           open ? "pointer-events-auto" : "pointer-events-none"
         }`}
       >
+        {/* Backdrop captures outside clicks when the mobile drawer is open. */}
         <div
           className={`absolute inset-0 bg-black/60 transition-opacity ${
             open ? "opacity-100" : "opacity-0"

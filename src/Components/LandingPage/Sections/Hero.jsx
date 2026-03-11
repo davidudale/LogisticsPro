@@ -3,6 +3,7 @@ import React from "react";
 const Hero = () => {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-24 pb-16 sm:pb-20">
+      {/* Full-bleed image and overlay establish contrast for the hero copy. */}
       <div className="absolute inset-0 z-0">
         <img
           src="https://images.unsplash.com/photo-1695222833131-54ee679ae8e5?q=80&w=841&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
@@ -40,6 +41,7 @@ const Hero = () => {
               className="w-full sm:w-auto flex flex-col sm:flex-row items-stretch gap-2 sm:gap-3"
               onSubmit={(e) => e.preventDefault()}
             >
+              {/* Placeholder form UI for tracking lookup until wired to real search logic. */}
               <input
                 type="text"
                 placeholder="Enter tracking ID"
@@ -60,6 +62,7 @@ const Hero = () => {
         </div>
 
         <div className="mt-10 sm:mt-12 grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 max-w-4xl mx-auto">
+          {/* Quick proof points reinforce the core value proposition above the fold. */}
           {[
             { title: "On-time rate", value: "98.7%" },
             { title: "Avg. route savings", value: "21%" },

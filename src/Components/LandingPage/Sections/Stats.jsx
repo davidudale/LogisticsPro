@@ -1,6 +1,7 @@
 import React from "react";
 
 const Stats = () => {
+  // Compact KPI set positioned under the hero to provide immediate business context.
   const stats = [
     { label: "Regions covered", value: "37", suffix: "Markets" },
     { label: "Throughput", value: "+18%", suffix: "Warehouse Flow" },

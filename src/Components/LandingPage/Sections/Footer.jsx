@@ -23,6 +23,7 @@ const Footer = () => {
           <div className="xl:col-span-2">
             <h5 className="text-white font-syncopate font-bold text-xs uppercase tracking-[0.2em] mb-8">Navigation</h5>
             <ul className="space-y-4">
+              {/* Footer links are placeholders until final public routes are defined. */}
               {["Home", "Features", "Network", "Pricing", "About"].map((link) => (
                 <li key={link}><a href="#" className="text-slate-400 hover:text-white transition-colors text-sm">{link}</a></li>
               ))}

@@ -3,6 +3,7 @@ import React from "react";
 const Sustainability = () => {
   return (
     <section id="network" className="py-20 sm:py-24 lg:py-28 bg-slate-900 overflow-hidden relative">
+      {/* Low-opacity background image adds texture while keeping the text column dominant. */}
       <div className="absolute top-0 right-0 w-full lg:w-[45%] h-full opacity-10">
         <img
           src="https://images.unsplash.com/photo-1565043589221-1a6fd9ae45c7?q=80&w=1935&auto=format&fit=crop"
@@ -27,6 +28,7 @@ const Sustainability = () => {
             </p>
 
             <div className="space-y-4 sm:space-y-5">
+              {/* Bullet points summarize operational capabilities without adding extra card UI. */}
               {[
                 "Dynamic lane balancing",
                 "Carbon-aware routing",
