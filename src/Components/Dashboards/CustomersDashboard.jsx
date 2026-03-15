@@ -1,12 +1,13 @@
 import React, { useState } from "react";
 import { addDoc, collection, getFirestore, serverTimestamp } from "firebase/firestore";
-import { Activity, ClipboardList, MapPin, Package, Plus } from "lucide-react";
+import { Activity, ClipboardList, Crosshair, LoaderCircle, MapPin, Package, Plus } from "lucide-react";
 import { toast } from "react-toastify";
 import { app } from "../Auth/firebase";
 import { useAuth } from "../Auth/AuthContext.jsx";
 import NavBar from "../Basics/NavBar.jsx";
 import Sidebar from "../Basics/Sidebar.jsx";
 import { nigeriaLocations, nigeriaStates } from "../../data/nigeriaLocations.js";
+import { useGeolocation } from "../../hooks/useGeolocation.js";
 
 const db = getFirestore(app);
 const createQuotationNumber = () => `QT-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`;
@@ -25,14 +26,26 @@ const initialOrderForm = {
   width: "",
   height: "",
   itemQuantity: 1,
+  originCoordinates: null,
+  destinationCoordinates: null,
 };
 
 const CustomersDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [activeGeoTarget, setActiveGeoTarget] = useState("");
   const [orderForm, setOrderForm] = useState(initialOrderForm);
   const { user } = useAuth();
+  const {
+    currentPosition,
+    error: geolocationError,
+    getCurrentPosition,
+    isFetching: isFetchingLocation,
+    isSupported: isGeolocationSupported,
+    permissionState,
+    resetError: resetGeolocationError,
+  } = useGeolocation();
   const stats = [
     { label: "Open Orders", value: "8", icon: ClipboardList },
     { label: "In Transit", value: "5", icon: MapPin },
@@ -62,6 +75,47 @@ const CustomersDashboard = () => {
     });
   };
 
+  const formatCoordinates = (coordinates) => {
+    if (!coordinates?.latitude || !coordinates?.longitude) {
+      return "Coordinates not captured yet.";
+    }
+
+    return `${coordinates.latitude.toFixed(6)}, ${coordinates.longitude.toFixed(6)}`;
+  };
+
+  const applyCurrentLocation = async (target) => {
+    setActiveGeoTarget(target);
+    resetGeolocationError();
+
+    const position = await getCurrentPosition();
+    if (!position) {
+      const message = geolocationError?.message || "Unable to capture your current location.";
+      toast.error(message);
+      setActiveGeoTarget("");
+      return;
+    }
+
+    const coordinates = {
+      latitude: position.latitude,
+      longitude: position.longitude,
+      accuracy: position.accuracy,
+      capturedAt: position.timestamp || Date.now(),
+    };
+
+    setOrderForm((prev) => ({
+      ...prev,
+      [target === "origin" ? "originCoordinates" : "destinationCoordinates"]: coordinates,
+      [target === "origin" ? "originAddress" : "destinationAddress"]:
+        prev[target === "origin" ? "originAddress" : "destinationAddress"]
+        || `Current location (${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)})`,
+    }));
+
+    toast.success(
+      `${target === "origin" ? "Pickup" : "Destination"} coordinates captured successfully.`,
+    );
+    setActiveGeoTarget("");
+  };
+
   const handleCreateOrder = async (event) => {
     event.preventDefault();
 
@@ -88,21 +142,23 @@ const CustomersDashboard = () => {
     try {
       const quotationNo = createQuotationNumber();
       const resolvedQuotationNo = orderForm.quotationNo.trim() || quotationNo;
-      await addDoc(collection(db, "Quotations"), {
-        quotationNo: resolvedQuotationNo,
-        customerName: orderForm.customerName.trim(),
-        origin: {
-          state: orderForm.originState.trim(),
-          lga: orderForm.originLga.trim(),
-          address: orderForm.originAddress.trim(),
-          country: "Nigeria",
-        },
-        destination: {
-          state: orderForm.destinationState.trim(),
-          lga: orderForm.destinationLga.trim(),
-          address: orderForm.destinationAddress.trim(),
-          country: "Nigeria",
-        },
+        await addDoc(collection(db, "Quotations"), {
+          quotationNo: resolvedQuotationNo,
+          customerName: orderForm.customerName.trim(),
+          origin: {
+            state: orderForm.originState.trim(),
+            lga: orderForm.originLga.trim(),
+            address: orderForm.originAddress.trim(),
+            country: "Nigeria",
+            coordinates: orderForm.originCoordinates,
+          },
+          destination: {
+            state: orderForm.destinationState.trim(),
+            lga: orderForm.destinationLga.trim(),
+            address: orderForm.destinationAddress.trim(),
+            country: "Nigeria",
+            coordinates: orderForm.destinationCoordinates,
+          },
         cargo: orderForm.cargo.trim(),
         weight: orderForm.weight.trim(),
         dimensions: {
@@ -224,7 +280,27 @@ const CustomersDashboard = () => {
                 required
               />
               <div className="sm:col-span-2 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Origin</p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Origin</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Capture your current pickup coordinates to help admin verify the route faster.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => applyCurrentLocation("origin")}
+                    disabled={!isGeolocationSupported || isFetchingLocation}
+                    className="inline-flex items-center gap-2 self-start rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-orange-500/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isFetchingLocation && activeGeoTarget === "origin" ? (
+                      <LoaderCircle size={14} className="animate-spin" />
+                    ) : (
+                      <Crosshair size={14} />
+                    )}
+                    Use current location
+                  </button>
+                </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <select
                     value={orderForm.originState}
@@ -261,9 +337,33 @@ const CustomersDashboard = () => {
                     required
                   />
                 </div>
+                <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs text-slate-400">
+                  <p className="font-semibold uppercase tracking-[0.12em] text-slate-500">Captured pickup coordinates</p>
+                  <p className="mt-1 text-slate-300">{formatCoordinates(orderForm.originCoordinates)}</p>
+                </div>
               </div>
               <div className="sm:col-span-2 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Destination</p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Destination</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Use this if you are requesting delivery to your present location.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => applyCurrentLocation("destination")}
+                    disabled={!isGeolocationSupported || isFetchingLocation}
+                    className="inline-flex items-center gap-2 self-start rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-orange-500/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isFetchingLocation && activeGeoTarget === "destination" ? (
+                      <LoaderCircle size={14} className="animate-spin" />
+                    ) : (
+                      <Crosshair size={14} />
+                    )}
+                    Use current location
+                  </button>
+                </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
                   <select
                     value={orderForm.destinationState}
@@ -299,6 +399,10 @@ const CustomersDashboard = () => {
                     placeholder="Destination address"
                     required
                   />
+                </div>
+                <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs text-slate-400">
+                  <p className="font-semibold uppercase tracking-[0.12em] text-slate-500">Captured destination coordinates</p>
+                  <p className="mt-1 text-slate-300">{formatCoordinates(orderForm.destinationCoordinates)}</p>
                 </div>
               </div>
               <input
@@ -376,6 +480,15 @@ const CustomersDashboard = () => {
               >
                 {isSubmittingOrder ? "Submitting..." : "Get Quotation"}
               </button>
+              {!isGeolocationSupported ? (
+                <p className="sm:col-span-2 text-xs text-amber-300">
+                  Geolocation is not supported in this browser, so coordinates cannot be captured automatically.
+                </p>
+              ) : permissionState === "denied" ? (
+                <p className="sm:col-span-2 text-xs text-amber-300">
+                  Location access is blocked in your browser. Enable it if you want pickup or destination coordinates attached to this quotation.
+                </p>
+              ) : null}
             </form>
           </div>
         </div>

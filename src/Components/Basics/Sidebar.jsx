@@ -94,12 +94,8 @@ const Sidebar = ({ open = false, onClose }) => {
   const links = roleLinks[user?.role] || [];
   const userLabel =
     user?.displayName || user?.email?.split("@")[0] || user?.role || "User";
-  const [expandedGroups, setExpandedGroups] = React.useState({
-    Operations: true,
-    Management: true,
-    Insights: true,
-    System: true,
-  });
+  const roleTag = (user?.role || "role").replace(/([a-z])([A-Z])/g, "$1 $2");
+  const [expandedGroups, setExpandedGroups] = React.useState({});
 
   React.useEffect(() => {
     // Keeps the sidebar expanded whenever the parent asks to open it on small screens.
@@ -109,54 +105,91 @@ const Sidebar = ({ open = false, onClose }) => {
   }, [open]);
 
   React.useEffect(() => {
-    const hasActiveChild = (item) =>
-      item.children?.some((child) =>
-        child.to
-          ? location.pathname === child.to || location.pathname.startsWith(`${child.to}/`)
-          : hasActiveChild(child),
-      );
+    const findActiveGroupChain = (items, parentKey = "root", trail = []) => {
+      for (const item of items) {
+        if (!item.children) {
+          continue;
+        }
 
-    const activeGroup = links.find(
-      (item) => item.children && hasActiveChild(item),
-    );
+        const itemKey = [...trail, item.label].join(">");
+        const directMatch = item.children.some(
+          (child) =>
+            child.to &&
+            (location.pathname === child.to || location.pathname.startsWith(`${child.to}/`)),
+        );
 
-    if (activeGroup) {
-      setExpandedGroups((prev) => ({ ...prev, [activeGroup.label]: true }));
+        if (directMatch) {
+          return [{ parentKey, itemKey }];
+        }
+
+        const nestedMatch = findActiveGroupChain(item.children, itemKey, [...trail, item.label]);
+        if (nestedMatch.length) {
+          return [{ parentKey, itemKey }, ...nestedMatch];
+        }
+      }
+
+      return [];
+    };
+
+    const activeChain = findActiveGroupChain(links);
+    if (activeChain.length) {
+      setExpandedGroups((prev) => {
+        const next = { ...prev };
+        activeChain.forEach(({ parentKey, itemKey }) => {
+          next[parentKey] = itemKey;
+        });
+        return next;
+      });
     }
   }, [links, location.pathname]);
 
-  const toggleGroup = (label) => {
-    setExpandedGroups((prev) => ({ ...prev, [label]: !prev[label] }));
+  const toggleGroup = (parentKey, itemKey) => {
+    setExpandedGroups((prev) => ({
+      ...prev,
+      [parentKey]: prev[parentKey] === itemKey ? null : itemKey,
+    }));
   };
 
   const renderLink = (item, nested = false, depth = 0) => {
     const Icon = item.icon;
-    const nestedSpacingClass = depth > 1 ? "ml-5 pl-4 text-[13px]" : "ml-3 pl-4 text-[13px]";
+    const nestedSpacingClass = depth > 1 ? "ml-4 pl-3" : "ml-2.5 pl-3";
 
     return (
       <NavLink
         key={item.to}
         to={item.to}
         className={({ isActive }) =>
-          `flex items-center gap-3 rounded-xl p-3 text-sm font-semibold transition-all group ${
+          `group flex items-center gap-2.5 rounded-xl border px-2.5 py-2 text-sm font-semibold tracking-[0.08em] transition-all ${
             nested ? nestedSpacingClass : ""
           } ${
             isActive
-              ? "bg-orange-600/10 text-orange-500"
-              : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
-          }`
+              ? "border-orange-500/40 bg-gradient-to-r from-orange-500/20 via-orange-500/8 to-transparent text-orange-100 shadow-[0_18px_40px_-28px_rgba(249,115,22,0.95)]"
+              : "border-transparent text-slate-400 hover:border-slate-700/70 hover:bg-slate-800/70 hover:text-slate-100"
+           }`
         }
         onClick={onClose}
       >
-        <Icon size={nested ? 16 : 18} />
-        <span className={`${isMobileExpanded ? "block" : "hidden"} lg:block`}>
-          {item.label}
-        </span>
+        {({ isActive }) => (
+          <>
+            <span
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-all ${
+                isActive
+                  ? "border-orange-400/40 bg-orange-500/15 text-orange-300"
+                  : "border-slate-800 bg-slate-900/70 text-slate-500 group-hover:border-slate-700 group-hover:text-slate-200"
+              }`}
+            >
+              <Icon size={nested ? 16 : 18} />
+            </span>
+            <span className={`${isMobileExpanded ? "block" : "hidden"} lg:block`}>
+              {item.label}
+            </span>
+          </>
+        )}
       </NavLink>
     );
   };
 
-  const renderItem = (item, depth = 0) => {
+  const renderItem = (item, depth = 0, trail = [], parentKey = "root") => {
     if (!item.children) {
       return renderLink(item, depth > 0, depth);
     }
@@ -168,24 +201,33 @@ const Sidebar = ({ open = false, onClose }) => {
           : hasActiveChild(child),
       );
 
-    const isExpanded = expandedGroups[item.label] ?? true;
+    const itemKey = [...trail, item.label].join(">");
+    const isExpanded = expandedGroups[parentKey] === itemKey;
     const isGroupActive = hasActiveChild(item);
     const Icon = item.icon;
 
     return (
-      <div key={item.label} className="space-y-1">
+      <div key={item.label} className="space-y-0.5">
         <button
           type="button"
-          onClick={() => toggleGroup(item.label)}
-          className={`w-full flex items-center gap-3 rounded-xl p-3 text-sm font-semibold transition-all ${
-            depth > 0 ? "ml-3" : ""
+          onClick={() => toggleGroup(parentKey, itemKey)}
+          className={`w-full flex items-center gap-2.5 rounded-xl border px-2.5 py-2 text-sm font-semibold tracking-[0.08em] transition-all ${
+            depth > 0 ? "ml-2.5" : ""
           } ${
             isGroupActive
-              ? "bg-slate-800/70 text-white"
-              : "text-slate-400 hover:bg-slate-800/50 hover:text-white"
-          }`}
+              ? "border-orange-500/30 bg-slate-900/95 text-white shadow-[0_18px_40px_-30px_rgba(249,115,22,0.85)]"
+              : "border-transparent text-slate-400 hover:border-slate-700/70 hover:bg-slate-900/70 hover:text-white"
+           }`}
         >
-          <Icon size={18} />
+          <span
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-all ${
+              isGroupActive
+                ? "border-orange-400/40 bg-orange-500/15 text-orange-300"
+                : "border-slate-800 bg-slate-900/70 text-slate-500"
+            }`}
+          >
+            <Icon size={18} />
+          </span>
           <span
             className={`${isMobileExpanded ? "block" : "hidden"} lg:block flex-1 text-left`}
           >
@@ -193,15 +235,17 @@ const Sidebar = ({ open = false, onClose }) => {
           </span>
           <ChevronDown
             size={16}
-            className={`${isMobileExpanded ? "block" : "hidden"} lg:block transition-transform ${
+            className={`${isMobileExpanded ? "block" : "hidden"} lg:block text-slate-500 transition-transform ${
               isExpanded ? "rotate-180" : ""
             }`}
           />
         </button>
 
         {isExpanded && (
-          <div className="space-y-1">
-            {item.children.map((child) => renderItem(child, depth + 1))}
+          <div className="space-y-0.5 border-l border-slate-800/70 pl-1.5">
+            {item.children.map((child) =>
+              renderItem(child, depth + 1, [...trail, item.label], itemKey),
+            )}
           </div>
         )}
       </div>
@@ -211,12 +255,15 @@ const Sidebar = ({ open = false, onClose }) => {
   return (
     <>
       <aside
-        className={`h-screen fixed border-r border-slate-800 bg-slate-900/20 transition-all duration-300 flex flex-col z-40 ${
+        className={`fixed z-40 flex h-screen flex-col overflow-hidden border-r border-orange-500/15 bg-slate-950/95 shadow-[0_30px_80px_-45px_rgba(249,115,22,0.5)] backdrop-blur-xl transition-all duration-300 ${
           isMobileExpanded ? "w-64" : "w-16"
         } lg:w-64`}
       >
-        <div className="p-4 lg:p-6 border-b border-slate-800/50">
-          <div className="flex items-center gap-4">
+        <div className="relative overflow-hidden border-b border-slate-800/70 px-4 py-4 lg:px-6 lg:py-6">
+          <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-orange-500/70 to-transparent" />
+          <div className="absolute -left-8 top-6 h-20 w-20 rounded-full bg-orange-500/10 blur-2xl" />
+          <div className="absolute right-0 top-10 h-24 w-24 rounded-full bg-amber-400/10 blur-3xl" />
+          <div className="relative flex items-center gap-4">
             <div className="relative shrink-0">
               {/* Mobile users can collapse the sidebar to an icon rail without affecting desktop. */}
               <button
@@ -225,32 +272,40 @@ const Sidebar = ({ open = false, onClose }) => {
                   setIsMobileExpanded((prev) => !prev);
                   onClose?.();
                 }}
-                className="ml-auto mb-4 relative lg:hidden p-2 rounded-lg border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800/50 transition-colors"
+                className="relative mb-4 ml-auto rounded-xl border border-slate-800 bg-slate-950/80 p-2 text-slate-400 transition-colors hover:border-orange-500/30 hover:bg-slate-900 hover:text-white lg:hidden"
                 aria-label="Toggle sidebar"
               >
                 {isMobileExpanded ? <X size={16} /> : <Menu size={16} />}
               </button>
-              <div className="w-8 h-8 lg:w-12 lg:h-12 rounded-full bg-gradient-to-br from-orange-500 to-orange-700 p-0.5 shadow-orange-500/20">
-                <div className="w-full h-full rounded-full bg-slate-950 flex items-center justify-center text-white font-bold text-xs lg:text-base">
+              <div className="h-8 w-8 rounded-2xl bg-gradient-to-br from-orange-400 via-orange-500 to-amber-600 p-[1px] shadow-[0_16px_35px_-18px_rgba(249,115,22,0.95)] lg:h-12 lg:w-12">
+                <div className="flex h-full w-full items-center justify-center rounded-2xl bg-slate-950 text-xs font-black text-white lg:text-base">
                   LP
                 </div>
               </div>
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-slate-950 rounded-full" />
+              <div className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-slate-950 bg-emerald-500" />
             </div>
             <div
-              className={`${isMobileExpanded ? "block" : "hidden"} lg:block overflow-hidden`}
+              className={`${isMobileExpanded ? "block" : "hidden"} lg:block min-w-0 overflow-hidden`}
             >
-              <p className="text-sm font-bold text-white uppercase tracking-tight truncate">
+              <p className="font-syncopate truncate text-sm font-bold uppercase tracking-[0.14em] text-white lg:text-[15px]">
+                LogisticsPro
+              </p>
+              <p className="mt-2 truncate text-xs font-semibold tracking-[0.08em] text-orange-300/90">
                 {userLabel}
               </p>
-              <p className="text-xs text-slate-500 uppercase tracking-[0.2em]">
-                {user?.role || "role"}
+              <p className="mt-1 truncate text-[11px] font-medium uppercase tracking-[0.16em] text-slate-500">
+                {roleTag}
               </p>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 bg-slate-900 overflow-y-auto py-4 px-3 space-y-1">
+        <nav className="flex-1 space-y-1 overflow-y-auto bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.08),_transparent_32%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,1))] px-2.5 py-4">
+          <div className={`${isMobileExpanded ? "block" : "hidden"} lg:block px-2.5 pb-1.5`}>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
+              Control Center
+            </p>
+          </div>
           {/* NavLink handles active-route styling so each role section stays declarative. */}
           {links.map((item) => renderItem(item))}
         </nav>

@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 
 import { AuthProvider } from "./Components/Auth/AuthContext.jsx";
+import { GeoLocationProvider } from "./Components/GeoLocation/GeoLocationContext.jsx";
 import App from "./App.jsx";
 import "./index.css";
 
@@ -15,9 +16,11 @@ if (!rootElement) {
 createRoot(rootElement).render(
   <StrictMode>
     <AuthProvider>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <GeoLocationProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </GeoLocationProvider>
     </AuthProvider>
   </StrictMode>,
 );
