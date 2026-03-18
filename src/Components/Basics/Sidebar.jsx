@@ -22,7 +22,22 @@ import { useAuth } from "../Auth/AuthContext.jsx";
 const roleLinks = {
   opsuser: [
     { label: "Dashboard", to: "/opsuser", icon: LayoutDashboard },
-    { label: "My Shipments", to: "/opsuser/shipments", icon: Package },
+    {
+      label: "My Shipments",
+      icon: Package,
+      children: [
+        {
+          label: "My Quotations",
+          to: "/opsuser/shipments/quotations",
+          icon: FileText,
+        },
+        {
+          label: "Shipment Requests",
+          to: "/opsuser/shipments/requests",
+          icon: ClipboardList,
+        },
+      ],
+    },
     { label: "Tracking", to: "/opsuser/tracking", icon: MapPin },
     { label: "Preferences", to: "/opsuser/settings", icon: Sliders },
   ],
@@ -54,13 +69,22 @@ const roleLinks = {
           label: "Order Management",
           icon: ClipboardList,
           children: [
-            { label: "Shipment Orders", to: "/admin/orders", icon: ClipboardList },
-            { label: "Pending Quotations", to: "/admin/pendingQuotation", icon: ClipboardList },
+            {
+              label: "Pending Quotations",
+              to: "/admin/pendingQuotation",
+              icon: ClipboardList,
+            },
+
+            {
+              label: "Shipment Orders",
+              to: "/admin/orders",
+              icon: ClipboardList,
+            },
           ],
         },
         { label: "Customers Management", to: "/admin/customers", icon: User },
         { label: "Accounts", to: "/admin/account", icon: FileText },
-        
+
         { label: "Reports", to: "/admin/reports", icon: FileText },
       ],
     },
@@ -81,7 +105,6 @@ const roleLinks = {
       icon: ClipboardList,
       children: [
         { label: "Audit Trail", to: "/admin/audit", icon: ClipboardList },
-
       ],
     },
   ],
@@ -115,14 +138,18 @@ const Sidebar = ({ open = false, onClose }) => {
         const directMatch = item.children.some(
           (child) =>
             child.to &&
-            (location.pathname === child.to || location.pathname.startsWith(`${child.to}/`)),
+            (location.pathname === child.to ||
+              location.pathname.startsWith(`${child.to}/`)),
         );
 
         if (directMatch) {
           return [{ parentKey, itemKey }];
         }
 
-        const nestedMatch = findActiveGroupChain(item.children, itemKey, [...trail, item.label]);
+        const nestedMatch = findActiveGroupChain(item.children, itemKey, [
+          ...trail,
+          item.label,
+        ]);
         if (nestedMatch.length) {
           return [{ parentKey, itemKey }, ...nestedMatch];
         }
@@ -158,6 +185,7 @@ const Sidebar = ({ open = false, onClose }) => {
       <NavLink
         key={item.to}
         to={item.to}
+        end={item.label === "Dashboard"}
         className={({ isActive }) =>
           `group flex items-center gap-2.5 rounded-xl border px-2.5 py-2 text-sm font-semibold tracking-[0.08em] transition-all ${
             nested ? nestedSpacingClass : ""
@@ -165,7 +193,7 @@ const Sidebar = ({ open = false, onClose }) => {
             isActive
               ? "border-orange-500/40 bg-gradient-to-r from-orange-500/20 via-orange-500/8 to-transparent text-orange-100 shadow-[0_18px_40px_-28px_rgba(249,115,22,0.95)]"
               : "border-transparent text-slate-400 hover:border-slate-700/70 hover:bg-slate-800/70 hover:text-slate-100"
-           }`
+          }`
         }
         onClick={onClose}
       >
@@ -180,7 +208,9 @@ const Sidebar = ({ open = false, onClose }) => {
             >
               <Icon size={nested ? 16 : 18} />
             </span>
-            <span className={`${isMobileExpanded ? "block" : "hidden"} lg:block`}>
+            <span
+              className={`${isMobileExpanded ? "block" : "hidden"} lg:block`}
+            >
               {item.label}
             </span>
           </>
@@ -197,13 +227,14 @@ const Sidebar = ({ open = false, onClose }) => {
     const hasActiveChild = (entry) =>
       entry.children?.some((child) =>
         child.to
-          ? location.pathname === child.to || location.pathname.startsWith(`${child.to}/`)
+          ? location.pathname === child.to ||
+            location.pathname.startsWith(`${child.to}/`)
           : hasActiveChild(child),
       );
 
     const itemKey = [...trail, item.label].join(">");
     const isExpanded = expandedGroups[parentKey] === itemKey;
-    const isGroupActive = hasActiveChild(item);
+    const hasSelectedChild = hasActiveChild(item);
     const Icon = item.icon;
 
     return (
@@ -214,15 +245,15 @@ const Sidebar = ({ open = false, onClose }) => {
           className={`w-full flex items-center gap-2.5 rounded-xl border px-2.5 py-2 text-sm font-semibold tracking-[0.08em] transition-all ${
             depth > 0 ? "ml-2.5" : ""
           } ${
-            isGroupActive
-              ? "border-orange-500/30 bg-slate-900/95 text-white shadow-[0_18px_40px_-30px_rgba(249,115,22,0.85)]"
+            isExpanded
+              ? "border-slate-700/80 bg-slate-900/95 text-white"
               : "border-transparent text-slate-400 hover:border-slate-700/70 hover:bg-slate-900/70 hover:text-white"
-           }`}
+          }`}
         >
           <span
             className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-all ${
-              isGroupActive
-                ? "border-orange-400/40 bg-orange-500/15 text-orange-300"
+              isExpanded
+                ? "border-slate-700 bg-slate-900 text-slate-200"
                 : "border-slate-800 bg-slate-900/70 text-slate-500"
             }`}
           >
@@ -235,9 +266,11 @@ const Sidebar = ({ open = false, onClose }) => {
           </span>
           <ChevronDown
             size={16}
-            className={`${isMobileExpanded ? "block" : "hidden"} lg:block text-slate-500 transition-transform ${
-              isExpanded ? "rotate-180" : ""
-            }`}
+            className={`${isMobileExpanded ? "block" : "hidden"} lg:block transition-transform ${
+              hasSelectedChild || isExpanded
+                ? "text-slate-300"
+                : "text-slate-500"
+            } ${isExpanded ? "rotate-180" : ""}`}
           />
         </button>
 
@@ -301,7 +334,9 @@ const Sidebar = ({ open = false, onClose }) => {
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto bg-[radial-gradient(circle_at_top,_rgba(249,115,22,0.08),_transparent_32%),linear-gradient(180deg,rgba(15,23,42,0.96),rgba(2,6,23,1))] px-2.5 py-4">
-          <div className={`${isMobileExpanded ? "block" : "hidden"} lg:block px-2.5 pb-1.5`}>
+          <div
+            className={`${isMobileExpanded ? "block" : "hidden"} lg:block px-2.5 pb-1.5`}
+          >
             <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">
               Control Center
             </p>

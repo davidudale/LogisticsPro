@@ -2,15 +2,54 @@
 
 :root {
   --inspectpro-accent: #f97316;
+  --inspectpro-scrollbar-track: #020617;
+  --inspectpro-scrollbar-thumb: rgba(249, 115, 22, 0.45);
+  --inspectpro-scrollbar-thumb-hover: rgba(251, 146, 60, 0.75);
+  --inspectpro-scrollbar-border: rgba(15, 23, 42, 0.95);
 }
 
 body {
   font-family: 'Bahnschrift Condensed', sans-serif;
+  scrollbar-color: var(--inspectpro-scrollbar-thumb) var(--inspectpro-scrollbar-track);
+  scrollbar-width: thin;
 }
 
 ::selection {
   background: var(--inspectpro-accent);
   color: white;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--inspectpro-scrollbar-thumb) var(--inspectpro-scrollbar-track);
+}
+
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+*::-webkit-scrollbar-track {
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(2, 6, 23, 1));
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background:
+    linear-gradient(180deg, rgba(249, 115, 22, 0.9), rgba(245, 158, 11, 0.72));
+  border: 3px solid var(--inspectpro-scrollbar-border);
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background:
+    linear-gradient(180deg, rgba(251, 146, 60, 0.98), rgba(249, 115, 22, 0.82));
+}
+
+*::-webkit-scrollbar-corner {
+  background: var(--inspectpro-scrollbar-track);
 }
 
 .inspectpro-toast {

@@ -5,16 +5,24 @@ import {
   doc,
   getDocs,
   getFirestore,
+  query,
   serverTimestamp,
+  setDoc,
   updateDoc,
+  where,
 } from "firebase/firestore";
-import { ClipboardList } from "lucide-react";
+import { ClipboardCheck, ClipboardList, Eye, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { app } from "../../Auth/firebase";
 import NavBar from "../../Basics/NavBar.jsx";
 import Sidebar from "../../Basics/Sidebar.jsx";
 
 const db = getFirestore(app);
+const resumableQuotationStatuses = new Set([
+  "Quotation Drafted",
+  "Quotation Sent and Pending Client Review",
+  "Quotation Under Negotiation",
+]);
 
 const formatLocation = (location) => {
   if (!location || typeof location !== "object") return "Not available";
@@ -44,6 +52,11 @@ const formatCoordinates = (coordinates) => {
 };
 
 const roundCurrency = (value) => Math.round(Number(value || 0));
+const formatCurrency = (value) => `NGN ${Number(value || 0).toLocaleString()}`;
+const createOrderNumberFromQuotation = (quotationNo, quotationId) =>
+  quotationNo?.startsWith("QT-")
+    ? quotationNo.replace("QT-", "ORD-")
+    : `ORD-${quotationNo || quotationId}`;
 
 const parseNumericValue = (value) => {
   const matched = value?.toString().match(/[\d.]+/);
@@ -214,6 +227,8 @@ const PendingQuotations = () => {
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
   const [selectedQuotation, setSelectedQuotation] = useState(null);
   const [quoteDraft, setQuoteDraft] = useState(null);
+  const [breakdownPreview, setBreakdownPreview] = useState(null);
+  const [quotationPreview, setQuotationPreview] = useState(null);
 
   const loadQuotations = useCallback(async () => {
     setLoading(true);
@@ -346,11 +361,80 @@ const PendingQuotations = () => {
     }
   };
 
+  const makeOrderFromQuotation = async (quotation) => {
+    const orderNo = quotation.orderNo || createOrderNumberFromQuotation(quotation.quotationNo, quotation.id);
+
+    setBusyRow(quotation.id);
+    try {
+      await setDoc(doc(db, "customer_order", quotation.id), {
+        quotationId: quotation.id,
+        quotationNo: quotation.quotationNo || "",
+        orderNo,
+        customerName: quotation.customerName || "Customer",
+        customerUid: quotation.customerUid || "",
+        customerEmail: quotation.customerEmail || "",
+        cargo: quotation.cargo || "",
+        weight: quotation.weight || "",
+        itemQuantity: quotation.itemQuantity || 1,
+        dimensions: quotation.dimensions || {},
+        origin: quotation.origin || {},
+        destination: quotation.destination || {},
+        deliveryAddress: quotation.deliveryAddress || formatLocation(quotation.destination),
+        status: "Created",
+        quoteTotal: quotation.quoteTotal || 0,
+        quotationBreakdown: quotation.quotationBreakdown || {},
+        source: "admin_make_order",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      await updateDoc(doc(db, "Quotations", quotation.id), {
+        orderCreated: true,
+        orderNo,
+        updatedAt: serverTimestamp(),
+      });
+
+      await loadQuotations();
+      toast.success(`Order created successfully: ${orderNo}`);
+    } catch (error) {
+      toast.error(error?.message || "Failed to create order from quotation.");
+    } finally {
+      setBusyRow("");
+    }
+  };
+
   // The confirmation flow starts with calculated defaults, then lets admins fine-tune the final commercial terms.
-  const openQuoteModal = (quotation) => {
-    setSelectedQuotation(quotation);
-    setQuoteDraft(buildQuoteDraft(quotation));
-    setQuoteModalOpen(true);
+  const openQuoteModal = async (quotation) => {
+    setBusyRow(quotation.id);
+    try {
+      let resolvedQuotation = quotation;
+
+      if (quotation.quotationNo && resumableQuotationStatuses.has(quotation.status)) {
+        const quotationSnapshot = await getDocs(
+          query(collection(db, "Quotations"), where("quotationNo", "==", quotation.quotationNo)),
+        );
+        const matchedQuotation = quotationSnapshot.docs
+          .map((item) => ({ id: item.id, ...item.data() }))
+          .find((item) => item.id === quotation.id) || quotationSnapshot.docs
+            .map((item) => ({ id: item.id, ...item.data() }))[0];
+
+        if (matchedQuotation) {
+          resolvedQuotation = matchedQuotation;
+        }
+      }
+
+      setSelectedQuotation(resolvedQuotation);
+      setQuoteDraft(
+        resolvedQuotation.pricingInputs
+          ? { ...buildQuoteDraft(resolvedQuotation), ...resolvedQuotation.pricingInputs }
+          : buildQuoteDraft(resolvedQuotation),
+      );
+      setQuoteModalOpen(true);
+    } catch (error) {
+      toast.error(error?.message || "Failed to open quotation details.");
+    } finally {
+      setBusyRow("");
+    }
   };
 
   const closeQuoteModal = () => {
@@ -360,6 +444,22 @@ const PendingQuotations = () => {
     setQuoteModalOpen(false);
     setSelectedQuotation(null);
     setQuoteDraft(null);
+  };
+
+  const openBreakdownPreview = (quotation) => {
+    setBreakdownPreview(quotation);
+  };
+
+  const closeBreakdownPreview = () => {
+    setBreakdownPreview(null);
+  };
+
+  const openQuotationPreview = (quotation) => {
+    setQuotationPreview(quotation);
+  };
+
+  const closeQuotationPreview = () => {
+    setQuotationPreview(null);
   };
 
   const quoteBreakdown = useMemo(
@@ -375,7 +475,7 @@ const PendingQuotations = () => {
     setBusyRow("confirm-quotation");
     try {
       await updateDoc(doc(db, "Quotations", selectedQuotation.id), {
-        status: "Quoted",
+        status: "Quotation Sent and Pending Client Review",
         confirmedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         pricingInputs: {
@@ -394,13 +494,41 @@ const PendingQuotations = () => {
     }
   };
 
-  const filteredQuotations = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) {
-      return quotations;
+  const saveQuotationDraft = async () => {
+    if (!selectedQuotation || !quoteDraft || !quoteBreakdown) {
+      return;
     }
 
-    return quotations.filter((quotation) => {
+    setBusyRow("save-quotation-draft");
+    try {
+      await updateDoc(doc(db, "Quotations", selectedQuotation.id), {
+        status: "Quotation Drafted",
+        draftSavedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        pricingInputs: {
+          ...quoteDraft,
+        },
+        quotationBreakdown: quoteBreakdown,
+        quoteTotal: quoteBreakdown.total,
+      });
+      await loadQuotations();
+      closeQuoteModal();
+      toast.success("Quotation draft saved successfully.");
+    } catch (error) {
+      toast.error(error?.message || "Failed to save quotation draft.");
+    } finally {
+      setBusyRow("");
+    }
+  };
+
+  const filteredQuotations = useMemo(() => {
+    const visibleQuotations = quotations.filter((quotation) => quotation.status !== "SAVE");
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) {
+      return visibleQuotations;
+    }
+
+    return visibleQuotations.filter((quotation) => {
       // Search spans admin-facing identifiers plus route fields so operations can find requests quickly.
       const values = [
         quotation.quotationNo,
@@ -432,9 +560,9 @@ const PendingQuotations = () => {
             <header className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Quotations</p>
               <h1 className="mt-2 text-3xl font-bold text-white">Pending Quotation Requests</h1>
-              <p className="mt-2 text-sm text-slate-400">
+              {/*<p className="mt-2 text-sm text-slate-400">
                 Review all customer quotation submissions saved in the <span className="text-orange-400">Quotations</span> collection.
-              </p>
+              </p>*/}
             </header>
 
             <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
@@ -485,6 +613,7 @@ const PendingQuotations = () => {
                           <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Dimensions</th>
                           <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Qty</th>
                           <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Status</th>
+                          <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Breakdown</th>
                           <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Actions</th>
                         </tr>
                       </thead>
@@ -492,6 +621,8 @@ const PendingQuotations = () => {
                         {filteredQuotations.map((quotation) => (
                           (() => {
                             const isEditing = editingQuotationId === quotation.id;
+                            const isAccepted = quotation.status === "Accepted";
+                            const hasOrder = Boolean(quotation.orderCreated || quotation.orderNo);
                             return (
                           <tr
                             key={quotation.id}
@@ -700,7 +831,25 @@ const PendingQuotations = () => {
                               )}
                             </td>
                             <td className="px-4 py-4">
-                              <div className="flex flex-col gap-2">
+                              {quotation.quotationBreakdown || quotation.quoteTotal ? (
+                                <div className="space-y-2">
+                                  <p className="text-sm font-semibold text-white">
+                                    {formatCurrency(quotation.quoteTotal || quotation.quotationBreakdown?.total)}
+                                  </p>
+                                  <button
+                                    type="button"
+                                    onClick={() => openBreakdownPreview(quotation)}
+                                    className="rounded-md border border-slate-600 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
+                                  >
+                                    View
+                                  </button>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-slate-500">Not available</p>
+                              )}
+                            </td>
+                            <td className="px-4 py-4">
+                              <div className="flex  items-center gap-2">
                                 {isEditing ? (
                                   <>
                                     <button
@@ -722,30 +871,38 @@ const PendingQuotations = () => {
                                   </>
                                 ) : (
                                   <>
-                                    <button
-                                      type="button"
-                                      onClick={() => startEditing(quotation)}
-                                      disabled={Boolean(editingQuotationId) || busyRow === quotation.id}
-                                      className="rounded-md border border-slate-600 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800 disabled:opacity-60"
-                                    >
-                                      Edit
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => openQuoteModal(quotation)}
-                                      disabled={Boolean(editingQuotationId) || busyRow === quotation.id}
-                                      className="rounded-md border border-orange-500/40 px-3 py-1.5 text-xs text-orange-300 hover:bg-orange-500/10 disabled:opacity-60"
-                                    >
-                                      Confirm Quote
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => deleteQuotation(quotation.id)}
-                                      disabled={busyRow === quotation.id}
-                                      className="rounded-md border border-rose-500/40 px-3 py-1.5 text-xs text-rose-300 hover:bg-rose-500/10 disabled:opacity-60"
-                                    >
-                                      {busyRow === quotation.id ? "Deleting..." : "Delete"}
-                                    </button>
+                                     <button
+                                       type="button"
+                                       title="View Quotation"
+                                       aria-label="View Quotation"
+                                       onClick={() => openQuotationPreview(quotation)}
+                                       disabled={Boolean(editingQuotationId) || busyRow === quotation.id}
+                                       className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-600 text-slate-200 hover:bg-slate-800 disabled:opacity-60"
+                                     >
+                                       <Eye size={16} />
+                                     </button>
+                                     <button
+                                       type="button"
+                                       title={isAccepted ? (hasOrder ? "Make Order Again" : "Make Order") : "Confirm Quote"}
+                                       aria-label={isAccepted ? (hasOrder ? "Make Order Again" : "Make Order") : "Confirm Quote"}
+                                       onClick={() => (
+                                         isAccepted ? makeOrderFromQuotation(quotation) : openQuoteModal(quotation)
+                                       )}
+                                       disabled={Boolean(editingQuotationId) || busyRow === quotation.id}
+                                       className="flex h-10 w-10 items-center justify-center rounded-md border border-orange-500/40 text-orange-300 hover:bg-orange-500/10 disabled:opacity-60"
+                                     >
+                                       <ClipboardCheck size={16} />
+                                     </button>
+                                     {/*<button
+                                       type="button"
+                                       title="Delete"
+                                       aria-label="Delete"
+                                       onClick={() => deleteQuotation(quotation.id)}
+                                       disabled={busyRow === quotation.id}
+                                       className="flex h-10 w-10 items-center justify-center rounded-md border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 disabled:opacity-60"
+                                     >
+                                       <Trash2 size={16} />
+                                     </button>*/}
                                   </>
                                 )}
                               </div>
@@ -912,14 +1069,149 @@ const PendingQuotations = () => {
                   <div className="flex justify-between text-slate-300"><span>Peak adjustment</span><span>NGN {quoteBreakdown.peakAdjustment.toLocaleString()}</span></div>
                   <div className="flex justify-between border-t border-slate-800 pt-2 font-semibold text-white"><span>Total quotation</span><span>NGN {quoteBreakdown.total.toLocaleString()}</span></div>
                 </div>
-                <button
-                  type="button"
-                  onClick={confirmQuotation}
-                  disabled={busyRow === "confirm-quotation"}
-                  className="w-full rounded-lg bg-orange-600 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-70"
-                >
-                  {busyRow === "confirm-quotation" ? "Confirming..." : "Confirm quotation"}
-                </button>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={saveQuotationDraft}
+                    disabled={busyRow === "confirm-quotation" || busyRow === "save-quotation-draft"}
+                    className="w-full rounded-lg border border-slate-600 bg-slate-950/60 px-4 py-3 text-sm font-semibold text-slate-200 hover:border-orange-500/40 hover:text-white disabled:opacity-70"
+                  >
+                    {busyRow === "save-quotation-draft" ? "Saving..." : "Save"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmQuotation}
+                    disabled={busyRow === "confirm-quotation" || busyRow === "save-quotation-draft"}
+                    className="w-full rounded-lg bg-orange-600 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-70"
+                  >
+                    {busyRow === "confirm-quotation" ? "Confirming..." : "Confirm quotation"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {quotationPreview ? (
+        <div className="fixed inset-0 z-[143] flex items-center justify-center bg-black/70 p-4">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Quotation preview</p>
+                <h3 className="mt-2 text-2xl font-bold text-white">
+                  {quotationPreview.quotationNo || "Quotation"}
+                </h3>
+                <p className="mt-1 text-sm text-slate-400">
+                  Review the customer quotation details before quoting or creating an order.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeQuotationPreview}
+                className="rounded-md border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Customer</p>
+                <p className="mt-2 text-sm font-semibold text-white">
+                  {quotationPreview.customerName || "Unknown"}
+                </p>
+                <p className="mt-1 text-sm text-slate-400">
+                  {quotationPreview.customerEmail || "No email"}
+                </p>
+                <p className="mt-3 text-xs text-slate-500">
+                  Reference: {quotationPreview.referenceNo || "N/A"}
+                </p>
+                <p className="mt-2">
+                  <span className="inline-flex rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-orange-300">
+                    {quotationPreview.status || "Pending"}
+                  </span>
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Shipment</p>
+                <p className="mt-2 text-sm text-slate-300">Cargo: {quotationPreview.cargo || "Not specified"}</p>
+                <p className="mt-1 text-sm text-slate-300">Weight: {quotationPreview.weight || "Not specified"}</p>
+                <p className="mt-1 text-sm text-slate-300">
+                  Dimensions: {formatDimensions(quotationPreview.dimensions)}
+                </p>
+                <p className="mt-1 text-sm text-slate-300">
+                  Quantity: {quotationPreview.itemQuantity || 1}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Origin</p>
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  {formatLocation(quotationPreview.origin)}
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  {formatCoordinates(quotationPreview.origin?.coordinates)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Destination</p>
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  {formatLocation(quotationPreview.destination)}
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  {formatCoordinates(quotationPreview.destination?.coordinates)}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+      {breakdownPreview ? (
+        <div className="fixed inset-0 z-[145] flex items-center justify-center bg-black/70 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-2xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Quotation breakdown</p>
+                <h3 className="mt-2 text-2xl font-bold text-white">
+                  {breakdownPreview.quotationNo || "Quotation"}
+                </h3>
+                <p className="mt-1 text-sm text-slate-400">
+                  Preview the saved pricing summary for this quotation.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeBreakdownPreview}
+                className="rounded-md border border-slate-700 px-3 py-1.5 text-xs text-slate-200 hover:bg-slate-800"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-6 space-y-4 rounded-2xl border border-slate-800 bg-slate-950/50 p-5">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Quote summary</p>
+                <h4 className="mt-2 text-3xl font-bold text-white">
+                  {formatCurrency(breakdownPreview.quoteTotal || breakdownPreview.quotationBreakdown?.total)}
+                </h4>
+                <p className="mt-1 text-sm text-slate-400">
+                  Chargeable weight: {breakdownPreview.quotationBreakdown?.chargeableWeightKg || 0} kg
+                </p>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between text-slate-300"><span>Base transport</span><span>{formatCurrency(breakdownPreview.quotationBreakdown?.baseTransport)}</span></div>
+                <div className="flex justify-between text-slate-300"><span>Vehicle capacity</span><span>{formatCurrency(breakdownPreview.quotationBreakdown?.capacityCharge)}</span></div>
+                <div className="flex justify-between text-slate-300"><span>Weight / volume</span><span>{formatCurrency(breakdownPreview.quotationBreakdown?.weightCharge)}</span></div>
+                <div className="flex justify-between text-slate-300"><span>Fuel</span><span>{formatCurrency(breakdownPreview.quotationBreakdown?.fuelCost)}</span></div>
+                <div className="flex justify-between text-slate-300"><span>Tolls</span><span>{formatCurrency(breakdownPreview.quotationBreakdown?.tollFees)}</span></div>
+                <div className="flex justify-between text-slate-300"><span>Urgency</span><span>{formatCurrency(breakdownPreview.quotationBreakdown?.urgencyCost)}</span></div>
+                <div className="flex justify-between text-slate-300"><span>Handling</span><span>{formatCurrency(breakdownPreview.quotationBreakdown?.handlingCost)}</span></div>
+                <div className="flex justify-between text-slate-300"><span>Insurance</span><span>{formatCurrency(breakdownPreview.quotationBreakdown?.insuranceCost)}</span></div>
+                <div className="flex justify-between text-slate-300"><span>Driver cost</span><span>{formatCurrency(breakdownPreview.quotationBreakdown?.driverCost)}</span></div>
+                <div className="flex justify-between text-slate-300"><span>Maintenance</span><span>{formatCurrency(breakdownPreview.quotationBreakdown?.maintenanceCost)}</span></div>
+                <div className="flex justify-between text-slate-300"><span>Additional services</span><span>{formatCurrency(breakdownPreview.quotationBreakdown?.additionalServicesCost)}</span></div>
+                <div className="flex justify-between border-t border-slate-800 pt-2 text-slate-300"><span>Subtotal</span><span>{formatCurrency(breakdownPreview.quotationBreakdown?.subtotal)}</span></div>
+                <div className="flex justify-between text-slate-300"><span>Peak adjustment</span><span>{formatCurrency(breakdownPreview.quotationBreakdown?.peakAdjustment)}</span></div>
+                <div className="flex justify-between border-t border-slate-800 pt-2 font-semibold text-white"><span>Total quotation</span><span>{formatCurrency(breakdownPreview.quoteTotal || breakdownPreview.quotationBreakdown?.total)}</span></div>
               </div>
             </div>
           </div>

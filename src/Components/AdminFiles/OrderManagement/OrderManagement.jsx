@@ -21,6 +21,7 @@ const COLLECTIONS = {
   customers: "customer_order",
   orders: "order_shipments",
   support: "order_issues",
+  notifications: "notifications",
 };
 
 const formatLocation = (location) => {
@@ -88,6 +89,28 @@ const OrderManagement = () => {
         row.status.toLowerCase().includes(value),
     );
   }, [customers, query]);
+
+  const createAssignmentNotification = async ({
+    title,
+    message,
+    orderNo,
+    truckId,
+    type,
+  }) => {
+    if (!orderNo || !truckId) {
+      return;
+    }
+
+    await addDoc(collection(db, COLLECTIONS.notifications), {
+      title,
+      message,
+      orderNo: orderNo.trim(),
+      targetRole: "driver",
+      targetTruckId: truckId.trim().toLowerCase(),
+      type,
+      createdAt: serverTimestamp(),
+    });
+  };
 
   const loadCollections = async () => {
     setLoading(true);
@@ -168,6 +191,13 @@ const OrderManagement = () => {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      await createAssignmentNotification({
+        title: "New Assignment",
+        message: `Order ${customerForm.orderNo.trim()} has been assigned to truck ${customerForm.truckId.trim().toUpperCase()}.`,
+        orderNo: customerForm.orderNo,
+        truckId: customerForm.truckId,
+        type: "assignment_created",
+      });
       setCustomerForm(emptyCustomerForm);
       await loadCollections();
       toast.success("Order created and assigned.");
@@ -182,6 +212,7 @@ const OrderManagement = () => {
     if (!editCustomer.orderNo || !editCustomer.customerName || !editCustomer.truckId || !editCustomer.deliveryAddress) return;
     setBusyRow(customerId);
     try {
+      const previousAssignment = customers.find((row) => row.id === customerId);
       await updateDoc(doc(db, COLLECTIONS.customers, customerId), {
         orderNo: editCustomer.orderNo.trim(),
         customerName: editCustomer.customerName.trim(),
@@ -189,6 +220,25 @@ const OrderManagement = () => {
         deliveryAddress: editCustomer.deliveryAddress.trim(),
         updatedAt: serverTimestamp(),
       });
+      await createAssignmentNotification({
+        title: "Assignment Updated",
+        message: `Order ${editCustomer.orderNo.trim()} is now assigned to truck ${editCustomer.truckId.trim().toUpperCase()}.`,
+        orderNo: editCustomer.orderNo,
+        truckId: editCustomer.truckId,
+        type: "assignment_updated",
+      });
+      if (
+        previousAssignment?.truckId
+        && previousAssignment.truckId.trim().toLowerCase() !== editCustomer.truckId.trim().toLowerCase()
+      ) {
+        await createAssignmentNotification({
+          title: "Assignment Reassigned",
+          message: `Order ${editCustomer.orderNo.trim()} has been moved away from truck ${previousAssignment.truckId.trim().toUpperCase()}.`,
+          orderNo: editCustomer.orderNo,
+          truckId: previousAssignment.truckId,
+          type: "assignment_removed",
+        });
+      }
       setEditingCustomerId("");
       await loadCollections();
       toast.success("Order assignment updated.");
@@ -202,7 +252,15 @@ const OrderManagement = () => {
   const deleteCustomer = async (customerId) => {
     setBusyRow(customerId);
     try {
+      const targetAssignment = customers.find((row) => row.id === customerId);
       await deleteDoc(doc(db, COLLECTIONS.customers, customerId));
+      await createAssignmentNotification({
+        title: "Assignment Removed",
+        message: `Order ${targetAssignment?.orderNo || customerId} is no longer assigned to truck ${targetAssignment?.truckId || "N/A"}.`,
+        orderNo: targetAssignment?.orderNo || customerId,
+        truckId: targetAssignment?.truckId || "",
+        type: "assignment_removed",
+      });
       await loadCollections();
       toast.success("Order assignment deleted.");
     } catch (deleteError) {
@@ -335,10 +393,7 @@ const OrderManagement = () => {
           <div className="mx-auto max-w-7xl space-y-6">
             <header className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Order Management</p>
-              <h1 className="mt-2 text-3xl font-bold text-white">Order creation, tracking updates, and delivery confirmation</h1>
-              <p className="mt-2 text-sm text-slate-400">
-                Firestore collections: <span className="text-orange-400">customer_order</span>, <span className="text-orange-400">order_shipments</span>, and <span className="text-orange-400">order_issues</span>.
-              </p>
+              
               {error ? <p className="mt-3 text-sm text-red-400">{error}</p> : null}
             </header>
 
@@ -671,5 +726,4 @@ const OrderManagement = () => {
 };
 
 export default OrderManagement;
-
 

@@ -1,14 +1,16 @@
 import React from "react";
 import "./App.css";
-import { Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Homepage from "./Components/LandingPage/Homepage.jsx";
 import Login from "./Components/Auth/Login.jsx";
 import Register from "./Components/Auth/Register.jsx";
 import ProtectedRoute from "./Components/Auth/ProtectedRoute.jsx";
+import NotificationListener from "./Components/Auth/NotificationListener.jsx";
 import CustomersDashboard from "./Components/Dashboards/CustomersDashboard.jsx";
 import Drivers from "./Components/Dashboards/Drivers.jsx";
+import DriverAssignments from "./Components/Drivers/DriverAssignments.jsx";
 import StaffDashboard from "./Components/Dashboards/StaffDashboard.jsx";
 import AdminDashboard from "./Components/Dashboards/AdminDashboard.jsx";
 import OrderManagement from "./Components/AdminFiles/OrderManagement/OrderManagement.jsx";
@@ -17,11 +19,14 @@ import CustomerOnboard from "./Components/UsersManagement/CustomerOnboard.jsx";
 import CustomerRegistration from "./Components/UsersManagement/CustomerRegistration.jsx";
 import CustomerManagement from "./Components/AdminFiles/CustomerManagement/CustomerManagement.jsx";
 import CustomersShipment from "./Components/Customers/CustomersShipment.jsx";
+import ShipmentOrdersSection from "./Components/Customers/ShipmentOrdersSection.jsx";
+import ShipmentQuotationsSection from "./Components/Customers/ShipmentQuotationsSection.jsx";
 import PendingQuotations from "./Components/AdminFiles/CustomerManagement/PendingQuotations.jsx";
 
 const App = () => {
   return (
     <>
+      <NotificationListener />
       <Routes>
         <Route path="/" element={<Homepage />} />
         <Route path="/login" element={<Login />} />
@@ -31,7 +36,11 @@ const App = () => {
 
         <Route element={<ProtectedRoute allowedRoles={["opsuser"]} />}>
           <Route path="/opsuser" element={<CustomersDashboard />} />
-          <Route path="/opsuser/shipments" element={<CustomersShipment />} />
+          <Route path="/opsuser/shipments" element={<CustomersShipment />}>
+            <Route index element={<Navigate to="quotations" replace />} />
+            <Route path="quotations" element={<ShipmentQuotationsSection />} />
+            <Route path="requests" element={<ShipmentOrdersSection />} />
+          </Route>
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["opsmanager"]} />}>
           <Route path="/opsmanager" element={<StaffDashboard />} />
@@ -41,6 +50,7 @@ const App = () => {
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["driver"]} />}>
           <Route path="/driver" element={<Drivers />} />
+          <Route path="/driver/assignments" element={<DriverAssignments />} />
         </Route>
         {/*Admin Routings*/}
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>

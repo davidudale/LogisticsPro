@@ -1,6 +1,7 @@
-import React, { useState } from "react";
-import { addDoc, collection, getFirestore, serverTimestamp } from "firebase/firestore";
+import React, { useEffect, useState } from "react";
+import { addDoc, collection, doc, getFirestore, serverTimestamp, updateDoc } from "firebase/firestore";
 import { Activity, ClipboardList, Crosshair, LoaderCircle, MapPin, Package, Plus } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { app } from "../Auth/firebase";
 import { useAuth } from "../Auth/AuthContext.jsx";
@@ -12,6 +13,7 @@ import { useGeolocation } from "../../hooks/useGeolocation.js";
 const db = getFirestore(app);
 const createQuotationNumber = () => `QT-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`;
 const initialOrderForm = {
+  id: "",
   quotationNo: "",
   customerName: "",
   originState: "",
@@ -33,10 +35,12 @@ const initialOrderForm = {
 const CustomersDashboard = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isCreateOrderOpen, setIsCreateOrderOpen] = useState(false);
-  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [submissionMode, setSubmissionMode] = useState("");
   const [activeGeoTarget, setActiveGeoTarget] = useState("");
   const [orderForm, setOrderForm] = useState(initialOrderForm);
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const {
     currentPosition,
     error: geolocationError,
@@ -52,6 +56,46 @@ const CustomersDashboard = () => {
     { label: "Delivered", value: "37", icon: Package },
     { label: "Satisfaction", value: "4.9/5", icon: Activity },
   ];
+
+  const openCreateQuotationModal = () => {
+    setOrderForm((prev) => ({
+      ...initialOrderForm,
+      quotationNo: createQuotationNumber(),
+      customerName: prev.customerName || user?.displayName || "",
+    }));
+    setIsCreateOrderOpen(true);
+  };
+
+  useEffect(() => {
+    if (location.state?.openQuotationModal) {
+      if (location.state?.editQuotation) {
+        const draftQuotation = location.state.editQuotation;
+        setOrderForm({
+          id: draftQuotation.id || "",
+          quotationNo: draftQuotation.quotationNo || createQuotationNumber(),
+          customerName: draftQuotation.customerName || user?.displayName || "",
+          originState: draftQuotation.origin?.state || "",
+          originLga: draftQuotation.origin?.lga || "",
+          originAddress: draftQuotation.origin?.address || "",
+          destinationState: draftQuotation.destination?.state || "",
+          destinationLga: draftQuotation.destination?.lga || "",
+          destinationAddress: draftQuotation.destination?.address || "",
+          cargo: draftQuotation.cargo || "",
+          weight: draftQuotation.weight || "",
+          length: draftQuotation.dimensions?.lengthCm || "",
+          width: draftQuotation.dimensions?.widthCm || "",
+          height: draftQuotation.dimensions?.heightCm || "",
+          itemQuantity: draftQuotation.itemQuantity || 1,
+          originCoordinates: draftQuotation.origin?.coordinates || null,
+          destinationCoordinates: draftQuotation.destination?.coordinates || null,
+        });
+        setIsCreateOrderOpen(true);
+      } else {
+        openCreateQuotationModal();
+      }
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.pathname, location.state, navigate, user?.displayName]);
 
   const handleOrderFieldChange = (name, value) => {
     setOrderForm((prev) => ({
@@ -116,77 +160,101 @@ const CustomersDashboard = () => {
     setActiveGeoTarget("");
   };
 
-  const handleCreateOrder = async (event) => {
-    event.preventDefault();
+  const buildQuotationPayload = (resolvedQuotationNo, status) => ({
+    quotationNo: resolvedQuotationNo,
+    customerName: orderForm.customerName.trim(),
+    origin: {
+      state: orderForm.originState.trim(),
+      lga: orderForm.originLga.trim(),
+      address: orderForm.originAddress.trim(),
+      country: "Nigeria",
+      coordinates: orderForm.originCoordinates,
+    },
+    destination: {
+      state: orderForm.destinationState.trim(),
+      lga: orderForm.destinationLga.trim(),
+      address: orderForm.destinationAddress.trim(),
+      country: "Nigeria",
+      coordinates: orderForm.destinationCoordinates,
+    },
+    cargo: orderForm.cargo.trim(),
+    weight: orderForm.weight.trim(),
+    dimensions: {
+      lengthCm: orderForm.length.trim(),
+      widthCm: orderForm.width.trim(),
+      heightCm: orderForm.height.trim(),
+    },
+    itemQuantity: orderForm.itemQuantity,
+    deliveryAddress: [
+      orderForm.destinationAddress.trim(),
+      orderForm.destinationLga.trim(),
+      orderForm.destinationState.trim(),
+      "Nigeria",
+    ].filter(Boolean).join(", "),
+    status,
+    customerUid: user?.uid || "",
+    customerEmail: user?.email || "",
+    updatedAt: serverTimestamp(),
+  });
 
+  const persistQuotation = async ({ mode, requireCompleteDetails }) => {
     if (
-      !orderForm.quotationNo
-      || !orderForm.customerName
-      || !orderForm.originState
-      || !orderForm.originLga
-      || !orderForm.originAddress
-      || !orderForm.destinationState
-      || !orderForm.destinationLga
-      || !orderForm.destinationAddress
-      || !orderForm.cargo
-      || !orderForm.weight
-      || !orderForm.length
-      || !orderForm.width
-      || !orderForm.height
+      requireCompleteDetails
+      && (
+        !orderForm.quotationNo
+        || !orderForm.customerName
+        || !orderForm.originState
+        || !orderForm.originLga
+        || !orderForm.originAddress
+        || !orderForm.destinationState
+        || !orderForm.destinationLga
+        || !orderForm.destinationAddress
+        || !orderForm.cargo
+        || !orderForm.weight
+        || !orderForm.length
+        || !orderForm.width
+        || !orderForm.height
+      )
     ) {
       toast.info("Complete all required order details before submitting.");
       return;
     }
 
-    setIsSubmittingOrder(true);
+    if (!requireCompleteDetails && !orderForm.customerName.trim() && !orderForm.cargo.trim()) {
+      toast.info("Add at least a customer name or cargo before saving a draft.");
+      return;
+    }
+
+    setSubmissionMode(mode);
     try {
       const quotationNo = createQuotationNumber();
       const resolvedQuotationNo = orderForm.quotationNo.trim() || quotationNo;
-        await addDoc(collection(db, "Quotations"), {
-          quotationNo: resolvedQuotationNo,
-          customerName: orderForm.customerName.trim(),
-          origin: {
-            state: orderForm.originState.trim(),
-            lga: orderForm.originLga.trim(),
-            address: orderForm.originAddress.trim(),
-            country: "Nigeria",
-            coordinates: orderForm.originCoordinates,
-          },
-          destination: {
-            state: orderForm.destinationState.trim(),
-            lga: orderForm.destinationLga.trim(),
-            address: orderForm.destinationAddress.trim(),
-            country: "Nigeria",
-            coordinates: orderForm.destinationCoordinates,
-          },
-        cargo: orderForm.cargo.trim(),
-        weight: orderForm.weight.trim(),
-        dimensions: {
-          lengthCm: orderForm.length.trim(),
-          widthCm: orderForm.width.trim(),
-          heightCm: orderForm.height.trim(),
-        },
-        itemQuantity: orderForm.itemQuantity,
-        deliveryAddress: [
-          orderForm.destinationAddress.trim(),
-          orderForm.destinationLga.trim(),
-          orderForm.destinationState.trim(),
-          "Nigeria",
-        ].filter(Boolean).join(", "),
-        status: "Pending",
-        customerUid: user?.uid || "",
-        customerEmail: user?.email || "",
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+      const payload = buildQuotationPayload(resolvedQuotationNo, mode === "draft" ? "SAVE" : "Pending");
 
-      toast.success(`Quotation request submitted: ${resolvedQuotationNo}`);
+      if (orderForm.id) {
+        await updateDoc(doc(db, "Quotations", orderForm.id), payload);
+      } else {
+        await addDoc(collection(db, "Quotations"), {
+          ...payload,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      toast.success(
+        mode === "draft"
+          ? `${orderForm.id ? "Quotation draft updated" : "Quotation draft saved"}: ${resolvedQuotationNo}`
+          : `${orderForm.id ? "Quotation updated and submitted" : "Quotation request submitted"}: ${resolvedQuotationNo}`,
+      );
       setOrderForm(initialOrderForm);
       setIsCreateOrderOpen(false);
     } catch (error) {
-      toast.error(error?.message || "Failed to submit quotation request.");
+      toast.error(
+        error?.message || (mode === "draft"
+          ? "Failed to save quotation draft."
+          : "Failed to submit quotation request."),
+      );
     } finally {
-      setIsSubmittingOrder(false);
+      setSubmissionMode("");
     }
   };
 
@@ -213,14 +281,7 @@ const CustomersDashboard = () => {
 
               <button
                 type="button"
-                onClick={() => {
-                  setOrderForm((prev) => ({
-                    ...prev,
-                    quotationNo: createQuotationNumber(),
-                    customerName: prev.customerName || user?.displayName || "",
-                  }));
-                  setIsCreateOrderOpen(true);
-                }}
+                onClick={openCreateQuotationModal}
                 className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-700"
               >
                 <Plus size={16} />
@@ -252,8 +313,8 @@ const CustomersDashboard = () => {
       </div>
 
       {isCreateOrderOpen ? (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4 ">
+          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-white">Get Quotation</h3>
               <button
@@ -265,7 +326,13 @@ const CustomersDashboard = () => {
               </button>
             </div>
 
-            <form onSubmit={handleCreateOrder} className="mt-4 grid gap-3 sm:grid-cols-2">
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                persistQuotation({ mode: "submit", requireCompleteDetails: true });
+              }}
+              className="mt-4 grid gap-3 sm:grid-cols-2"
+            >
               <input
                 value={orderForm.quotationNo}
                 readOnly
@@ -474,11 +541,19 @@ const CustomersDashboard = () => {
                 </div>
               </div>
               <button
-                type="submit"
-                disabled={isSubmittingOrder}
-                className="sm:col-span-2 rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-70"
+                type="button"
+                onClick={() => persistQuotation({ mode: "draft", requireCompleteDetails: false })}
+                disabled={submissionMode !== ""}
+                className="rounded-lg border border-slate-600 bg-slate-950/50 px-3 py-2 text-sm font-semibold text-slate-200 hover:border-orange-500/40 hover:text-white disabled:opacity-70"
               >
-                {isSubmittingOrder ? "Submitting..." : "Get Quotation"}
+                {submissionMode === "draft" ? "Saving Draft..." : "Save Draft"}
+              </button>
+              <button
+                type="submit"
+                disabled={submissionMode !== ""}
+                className="rounded-lg bg-orange-600 px-3 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-70"
+              >
+                {submissionMode === "submit" ? "Submitting..." : "Get Quotation"}
               </button>
               {!isGeolocationSupported ? (
                 <p className="sm:col-span-2 text-xs text-amber-300">
