@@ -380,7 +380,7 @@ const PendingQuotations = () => {
         origin: quotation.origin || {},
         destination: quotation.destination || {},
         deliveryAddress: quotation.deliveryAddress || formatLocation(quotation.destination),
-        status: "Created",
+        status: "New Order",
         quoteTotal: quotation.quoteTotal || 0,
         quotationBreakdown: quotation.quotationBreakdown || {},
         source: "admin_make_order",
@@ -522,7 +522,9 @@ const PendingQuotations = () => {
   };
 
   const filteredQuotations = useMemo(() => {
-    const visibleQuotations = quotations.filter((quotation) => quotation.status !== "SAVE");
+    const visibleQuotations = quotations.filter(
+      (quotation) => quotation.status !== "SAVE" && quotation.status !== "Quotation Accepted",
+    );
     const query = searchQuery.trim().toLowerCase();
     if (!query) {
       return visibleQuotations;
@@ -623,6 +625,8 @@ const PendingQuotations = () => {
                             const isEditing = editingQuotationId === quotation.id;
                             const isAccepted = quotation.status === "Accepted";
                             const hasOrder = Boolean(quotation.orderCreated || quotation.orderNo);
+                            const isPendingClientReview =
+                              quotation.status === "Quotation Sent and Pending Client Review";
                             return (
                           <tr
                             key={quotation.id}
@@ -858,7 +862,7 @@ const PendingQuotations = () => {
                                       disabled={busyRow === quotation.id}
                                       className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-70"
                                     >
-                                      {busyRow === quotation.id ? "Saving..." : "Save"}
+                                      {busyRow === quotation.id ? "Saving..." : "Save "}
                                     </button>
                                     <button
                                       type="button"
@@ -882,12 +886,12 @@ const PendingQuotations = () => {
                                        <Eye size={16} />
                                      </button>
                                      <button
-                                       type="button"
-                                       title={isAccepted ? (hasOrder ? "Make Order Again" : "Make Order") : "Confirm Quote"}
-                                       aria-label={isAccepted ? (hasOrder ? "Make Order Again" : "Make Order") : "Confirm Quote"}
-                                       onClick={() => (
-                                         isAccepted ? makeOrderFromQuotation(quotation) : openQuoteModal(quotation)
-                                       )}
+                                        type="button"
+                                        title={isAccepted ? (hasOrder ? "Make Order Again" : "Make Order") : (isPendingClientReview ? "Send quotation" : "Confirm Quote")}
+                                        aria-label={isAccepted ? (hasOrder ? "Make Order Again" : "Make Order") : (isPendingClientReview ? "Send quotation" : "Confirm Quote")}
+                                        onClick={() => (
+                                          isAccepted ? makeOrderFromQuotation(quotation) : openQuoteModal(quotation)
+                                        )}
                                        disabled={Boolean(editingQuotationId) || busyRow === quotation.id}
                                        className="flex h-10 w-10 items-center justify-center rounded-md border border-orange-500/40 text-orange-300 hover:bg-orange-500/10 disabled:opacity-60"
                                      >
@@ -1076,7 +1080,7 @@ const PendingQuotations = () => {
                     disabled={busyRow === "confirm-quotation" || busyRow === "save-quotation-draft"}
                     className="w-full rounded-lg border border-slate-600 bg-slate-950/60 px-4 py-3 text-sm font-semibold text-slate-200 hover:border-orange-500/40 hover:text-white disabled:opacity-70"
                   >
-                    {busyRow === "save-quotation-draft" ? "Saving..." : "Save"}
+                    {busyRow === "save-quotation-draft" ? "Saving..." : "Save Quotation Draft"}
                   </button>
                   <button
                     type="button"
@@ -1084,7 +1088,11 @@ const PendingQuotations = () => {
                     disabled={busyRow === "confirm-quotation" || busyRow === "save-quotation-draft"}
                     className="w-full rounded-lg bg-orange-600 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-70"
                   >
-                    {busyRow === "confirm-quotation" ? "Confirming..." : "Confirm quotation"}
+                    {busyRow === "confirm-quotation"
+                      ? "Sending..."
+                      : selectedQuotation.status === "Quotation Sent and Pending Client Review"
+                        ? "Send quotation"
+                        : "Confirm quotation"}
                   </button>
                 </div>
               </div>

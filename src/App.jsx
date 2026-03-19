@@ -15,6 +15,18 @@ import StaffDashboard from "./Components/Dashboards/StaffDashboard.jsx";
 import AdminDashboard from "./Components/Dashboards/AdminDashboard.jsx";
 import OrderManagement from "./Components/AdminFiles/OrderManagement/OrderManagement.jsx";
 import FleetManagement from "./Components/AdminFiles/FleetManagement/FleetManagement.jsx";
+import DriverManagement from "./Components/AdminFiles/FleetManagement/DriverManagement.jsx";
+import RouteManagement from "./Components/AdminFiles/FleetManagement/RouteManagement.jsx";
+import MaintenanceManagement from "./Components/AdminFiles/FleetManagement/MaintenanceManagement.jsx";
+import FuelManagement from "./Components/AdminFiles/FleetManagement/FuelManagement.jsx";
+import TrackingMonitoring from "./Components/AdminFiles/FleetManagement/TrackingMonitoring.jsx";
+import ComplianceManagement from "./Components/AdminFiles/FleetManagement/ComplianceManagement.jsx";
+import FleetReportsAnalytics from "./Components/AdminFiles/FleetManagement/FleetReportsAnalytics.jsx";
+import AccountsManagement from "./Components/AdminFiles/AccountsManagement.jsx";
+import AdminReports from "./Components/AdminFiles/AdminReports.jsx";
+import UsersManagement from "./Components/AdminFiles/UsersManagement.jsx";
+import WarehouseManagement from "./Components/AdminFiles/WarehouseManagement.jsx";
+import AdminSettings from "./Components/AdminFiles/AdminSettings.jsx";
 import CustomerOnboard from "./Components/UsersManagement/CustomerOnboard.jsx";
 import CustomerRegistration from "./Components/UsersManagement/CustomerRegistration.jsx";
 import CustomerManagement from "./Components/AdminFiles/CustomerManagement/CustomerManagement.jsx";
@@ -68,6 +80,42 @@ const App = () => {
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route path="/admin/fleet" element={<FleetManagement />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin/driver" element={<DriverManagement />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin/fleet/routes" element={<RouteManagement />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin/fleet/maintenance" element={<MaintenanceManagement />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin/fleet/fuel" element={<FuelManagement />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin/fleet/tracking" element={<TrackingMonitoring />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin/fleet/compliance" element={<ComplianceManagement />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin/fleet/reports" element={<FleetReportsAnalytics />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin/account" element={<AccountsManagement />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin/reports" element={<AdminReports />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin/users" element={<UsersManagement />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin/warehouse" element={<WarehouseManagement />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin/settings" element={<AdminSettings />} />
         </Route>
       </Routes>
       <ToastContainer

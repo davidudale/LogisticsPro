@@ -180,7 +180,7 @@ const CustomersShipment = () => {
           origin: targetQuotation.origin || {},
           destination: targetQuotation.destination || {},
           deliveryAddress: targetQuotation.deliveryAddress || formatLocation(targetQuotation.destination),
-          status: "Created",
+          status: "New Order",
           quoteTotal: targetQuotation.quoteTotal || 0,
           quotationBreakdown: targetQuotation.quotationBreakdown || {},
           source: "quotation_acceptance",
@@ -237,7 +237,7 @@ const CustomersShipment = () => {
               destination: targetQuotationRecord.destination || {},
               deliveryAddress:
                 targetQuotationRecord.deliveryAddress || formatLocation(targetQuotationRecord.destination),
-              status: "Created",
+              status: "New Order",
               quoteTotal: targetQuotationRecord.quoteTotal || 0,
               quotationBreakdown: targetQuotationRecord.quotationBreakdown || {},
               source: "quotation_acceptance",

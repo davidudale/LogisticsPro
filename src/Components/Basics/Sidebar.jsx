@@ -1,17 +1,22 @@
 import React from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import {
+  BarChart3,
   ClipboardList,
   ChevronDown,
   FileText,
+  Fuel,
   LayoutDashboard,
   MapPin,
   Package,
+  Route,
   Settings,
+  ShieldCheck,
   Sliders,
   Truck,
   Users,
   Warehouse,
+  Wrench,
   Menu,
   X,
   User,
@@ -82,6 +87,20 @@ const roleLinks = {
             },
           ],
         },
+        {
+          label: "Fleet Management",
+          icon: Truck,
+          children: [
+            { label: "Vehicle Management", to: "/admin/fleet", icon: Truck },
+            { label: "Driver Management", to: "/admin/driver", icon: Users },
+            { label: "Route Management", to: "/admin/fleet/routes", icon: Route },
+            { label: "Maintenance Management", to: "/admin/fleet/maintenance", icon: Wrench },
+            { label: "Fuel Management", to: "/admin/fleet/fuel", icon: Fuel },
+            { label: "Tracking & Monitoring", to: "/admin/fleet/tracking", icon: MapPin },
+            { label: "Compliance Management", to: "/admin/fleet/compliance", icon: ShieldCheck },
+            { label: "Reporting & Analytics", to: "/admin/fleet/reports", icon: BarChart3 },
+          ],
+        },
         { label: "Customers Management", to: "/admin/customers", icon: User },
         { label: "Accounts", to: "/admin/account", icon: FileText },
 
@@ -94,7 +113,6 @@ const roleLinks = {
       icon: Settings,
       children: [
         { label: "Users Management", to: "/admin/users", icon: Users },
-        { label: "Fleet Management", to: "/admin/fleet", icon: Truck },
         { label: "Drivers Management", to: "/admin/driver", icon: Users },
         { label: "Warehouse", to: "/admin/warehouse", icon: Warehouse },
         { label: "Settings", to: "/admin/settings", icon: Settings },
@@ -185,7 +203,7 @@ const Sidebar = ({ open = false, onClose }) => {
       <NavLink
         key={item.to}
         to={item.to}
-        end={item.label === "Dashboard"}
+        end
         className={({ isActive }) =>
           `group flex items-center gap-2.5 rounded-xl border px-2.5 py-2 text-sm font-semibold tracking-[0.08em] transition-all ${
             nested ? nestedSpacingClass : ""

@@ -1,8 +1,10 @@
-import React from "react";
-import { Box } from "lucide-react";
+import React, { useState } from "react";
+import { Box, Printer } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
+import InvoicePreviewModal from "../Shared/InvoicePreviewModal.jsx";
 
 const ShipmentOrdersSection = () => {
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
   const {
     loading,
     filteredOrders,
@@ -23,6 +25,7 @@ const ShipmentOrdersSection = () => {
       </p>
     </div>
   ) : (
+    <>
     <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-5">
       <div className="flex items-center gap-2">
         <Box size={18} className="text-orange-400" />
@@ -46,6 +49,7 @@ const ShipmentOrdersSection = () => {
                 <th className="px-3 py-3">Weight</th>
                 <th className="px-3 py-3">Dimensions</th>
                 <th className="px-3 py-3">ETA</th>
+                <th className="px-3 py-3">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -69,6 +73,20 @@ const ShipmentOrdersSection = () => {
                     <p className="mt-1 text-xs text-slate-500">Qty: {order.itemQuantity || 1}</p>
                   </td>
                   <td className="px-3 py-4 text-slate-300">{order.eta || "Pending Confirmation"}</td>
+                  <td className="px-3 py-4">
+                    {order.status === "Invoice sent" ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedInvoice(order)}
+                        className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-slate-800"
+                      >
+                        <Printer size={14} />
+                        Print
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-500">Not available</span>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -76,6 +94,8 @@ const ShipmentOrdersSection = () => {
         </div>
       </div>
     </div>
+    <InvoicePreviewModal order={selectedInvoice} onClose={() => setSelectedInvoice(null)} />
+    </>
   );
 };
 
