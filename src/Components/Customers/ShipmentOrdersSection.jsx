@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Box, Printer } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
 import InvoicePreviewModal from "../Shared/InvoicePreviewModal.jsx";
@@ -12,6 +12,33 @@ const ShipmentOrdersSection = () => {
     formatLocation,
     formatDimensions,
   } = useOutletContext();
+  const getTimestampValue = (value) => {
+    if (!value) return 0;
+    if (typeof value?.toDate === "function") return value.toDate().getTime();
+    if (typeof value?.seconds === "number") return value.seconds * 1000;
+    const parsedValue = new Date(value).getTime();
+    return Number.isNaN(parsedValue) ? 0 : parsedValue;
+  };
+  const formatTimestamp = (order) => {
+    const rawValue = order.updatedAt || order.createdAt;
+    const timestampValue = getTimestampValue(rawValue);
+    if (!timestampValue) return "Not available";
+    return new Intl.DateTimeFormat("en-NG", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(timestampValue));
+  };
+  const sortedOrders = useMemo(
+    () => [...filteredOrders].sort(
+      (left, right) =>
+        getTimestampValue(right.updatedAt || right.createdAt)
+        - getTimestampValue(left.updatedAt || left.createdAt),
+    ),
+    [filteredOrders],
+  );
 
   return loading ? (
     <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-8 text-center text-sm text-slate-400">
@@ -36,11 +63,12 @@ const ShipmentOrdersSection = () => {
       </p>
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-slate-800">
-        <div className="overflow-x-auto">
+        <div className="max-h-[58vh] overflow-auto pr-3">
           <table className="min-w-[1100px] w-full text-left text-sm">
             <thead className="bg-slate-900/80">
               <tr className="border-b border-slate-800 text-xs uppercase tracking-[0.12em] text-slate-400">
                 <th className="px-3 py-3">Order No</th>
+                <th className="px-3 py-3">Timestamp</th>
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3">Customer</th>
                 <th className="px-3 py-3">Origin</th>
@@ -53,9 +81,10 @@ const ShipmentOrdersSection = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredOrders.map((order) => (
+              {sortedOrders.map((order) => (
                 <tr key={order.id} className="border-b border-slate-800/80 align-top hover:bg-slate-900/30">
                   <td className="px-3 py-4 font-semibold text-white">{order.orderNo || "Order"}</td>
+                  <td className="px-3 py-4 text-slate-300">{formatTimestamp(order)}</td>
                   <td className="px-3 py-4">
                     <span className="inline-flex rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-orange-300">
                       {order.status || "Created"}

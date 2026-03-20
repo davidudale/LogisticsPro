@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { app } from "../Auth/firebase";
 import { useAuth } from "../Auth/AuthContext.jsx";
+import { createNotificationRecord } from "../Auth/notificationUtils.js";
 import NavBar from "../Basics/NavBar.jsx";
 import Sidebar from "../Basics/Sidebar.jsx";
 import { nigeriaLocations, nigeriaStates } from "../../data/nigeriaLocations.js";
@@ -119,6 +120,14 @@ const CustomersDashboard = () => {
     });
   };
 
+  const handleItemQuantityChange = (value) => {
+    const numericValue = Number(value);
+    setOrderForm((prev) => ({
+      ...prev,
+      itemQuantity: value === "" ? "" : Math.max(1, Number.isFinite(numericValue) ? numericValue : 1),
+    }));
+  };
+
   const formatCoordinates = (coordinates) => {
     if (!coordinates?.latitude || !coordinates?.longitude) {
       return "Coordinates not captured yet.";
@@ -229,7 +238,7 @@ const CustomersDashboard = () => {
     try {
       const quotationNo = createQuotationNumber();
       const resolvedQuotationNo = orderForm.quotationNo.trim() || quotationNo;
-      const payload = buildQuotationPayload(resolvedQuotationNo, mode === "draft" ? "SAVE" : "Pending");
+      const payload = buildQuotationPayload(resolvedQuotationNo, mode === "draft" ? "SAVE" : "Quotation Pending");
 
       if (orderForm.id) {
         await updateDoc(doc(db, "Quotations", orderForm.id), payload);
@@ -237,6 +246,18 @@ const CustomersDashboard = () => {
         await addDoc(collection(db, "Quotations"), {
           ...payload,
           createdAt: serverTimestamp(),
+        });
+      }
+
+      if (mode !== "draft") {
+        await createNotificationRecord({
+          title: "Quotation Request Submitted",
+          message: `${orderForm.customerName.trim() || "A customer"} submitted quotation ${resolvedQuotationNo} for admin review.`,
+          targetRole: "admin",
+          type: "quotation_submitted",
+          quotationNo: resolvedQuotationNo,
+          customerUid: user?.uid || "",
+          customerEmail: user?.email || "",
         });
       }
 
@@ -529,7 +550,13 @@ const CustomersDashboard = () => {
                     >
                       -
                     </button>
-                    <span className="text-sm font-semibold text-white">{orderForm.itemQuantity}</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={orderForm.itemQuantity}
+                      onChange={(event) => handleItemQuantityChange(event.target.value)}
+                      className="mx-3 w-20 rounded-md border border-slate-700 bg-slate-950/80 px-2 py-1 text-center text-sm font-semibold text-white outline-none focus:border-orange-500"
+                    />
                     <button
                       type="button"
                       onClick={() => updateItemQuantity(1)}

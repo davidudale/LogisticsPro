@@ -15,6 +15,7 @@ import {
 import NavBar from "../../Basics/NavBar.jsx";
 import Sidebar from "../../Basics/Sidebar.jsx";
 import { app } from "../../Auth/firebase";
+import { createNotificationRecord } from "../../Auth/notificationUtils.js";
 import InvoicePreviewModal from "../../Shared/InvoicePreviewModal.jsx";
 
 const db = getFirestore(app);
@@ -32,6 +33,26 @@ const formatLocation = (location) => {
   return [location.address, location.lga, location.state, location.country].filter(Boolean).join(", ");
 };
 
+const getTimestampValue = (value) => {
+  if (!value) return 0;
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
+  const parsedValue = new Date(value).getTime();
+  return Number.isNaN(parsedValue) ? 0 : parsedValue;
+};
+
+const formatTimestamp = (record) => {
+  const timestampValue = getTimestampValue(record.updatedAt || record.createdAt);
+  if (!timestampValue) return "Not available";
+  return new Intl.DateTimeFormat("en-NG", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestampValue));
+};
+
 const mapCustomerRecord = (item) => {
   const data = item.data();
     return {
@@ -39,10 +60,12 @@ const mapCustomerRecord = (item) => {
       orderNo: data.orderNo || "",
       quotationNo: data.quotationNo || "",
       customerName: data.customerName || data.customer || "",
+      customerUid: data.customerUid || "",
+      customerEmail: data.customerEmail || "",
       truckId: data.truckId || "",
       cargo: data.cargo || "",
       weight: data.weight || "",
-      status: data.status || "New Order",
+      status: data.status || "Shipment Booking - In Progress",
       origin: formatLocation(data.origin),
       destination: formatLocation(data.destination),
       deliveryAddress: data.deliveryAddress || formatLocation(data.destination),
@@ -51,6 +74,8 @@ const mapCustomerRecord = (item) => {
       dimensions: data.dimensions || {},
       quoteTotal: data.quoteTotal || 0,
       quotationBreakdown: data.quotationBreakdown || {},
+      createdAt: data.createdAt || null,
+      updatedAt: data.updatedAt || null,
     };
   };
 
@@ -62,6 +87,8 @@ const mapOrderRecord = (item) => {
     truckId: data.truckId || "",
     location: data.location || "",
     eta: data.eta || "TBD",
+    createdAt: data.createdAt || null,
+    updatedAt: data.updatedAt || null,
   };
 };
 
@@ -73,6 +100,8 @@ const mapSupportRecord = (item) => {
     orderNo: data.orderNo || "",
     confirmation: data.confirmation || "Pending",
     feedback: data.feedback || "",
+    createdAt: data.createdAt || null,
+    updatedAt: data.updatedAt || null,
   };
 };
 
@@ -129,18 +158,42 @@ const OrderManagement = () => {
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [selectedTruckId, setSelectedTruckId] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [sendInvoiceChecked, setSendInvoiceChecked] = useState(false);
 
   const filteredCustomers = useMemo(() => {
     const value = query.trim().toLowerCase();
-    if (!value) return customers;
-    return customers.filter(
+    const sortByNewest = (items) => [...items].sort(
+      (left, right) =>
+        getTimestampValue(right.updatedAt || right.createdAt)
+        - getTimestampValue(left.updatedAt || left.createdAt),
+    );
+    if (!value) return sortByNewest(customers);
+    return sortByNewest(customers.filter(
       (row) =>
         row.orderNo.toLowerCase().includes(value) ||
         row.customerName.toLowerCase().includes(value) ||
         row.cargo.toLowerCase().includes(value) ||
         row.status.toLowerCase().includes(value),
-    );
+    ));
   }, [customers, query]);
+
+  const sortedOrders = useMemo(
+    () => [...orders].sort(
+      (left, right) =>
+        getTimestampValue(right.updatedAt || right.createdAt)
+        - getTimestampValue(left.updatedAt || left.createdAt),
+    ),
+    [orders],
+  );
+
+  const sortedSupportTickets = useMemo(
+    () => [...supportTickets].sort(
+      (left, right) =>
+        getTimestampValue(right.updatedAt || right.createdAt)
+        - getTimestampValue(left.updatedAt || left.createdAt),
+    ),
+    [supportTickets],
+  );
 
   const selectedTruck = useMemo(
     () => fleetVehicles.find((vehicle) => vehicle.id === selectedTruckId) || null,
@@ -166,6 +219,26 @@ const OrderManagement = () => {
       targetTruckId: truckId.trim().toLowerCase(),
       type,
       createdAt: serverTimestamp(),
+    });
+  };
+
+  const createOpsUserNotification = async ({
+    title,
+    message,
+    customerUid,
+    customerEmail,
+    orderNo,
+    quotationNo,
+    type,
+  }) => {
+    await createNotificationRecord({
+      title,
+      message,
+      targetUid: customerUid,
+      targetEmail: customerEmail,
+      orderNo,
+      quotationNo,
+      type,
     });
   };
 
@@ -235,6 +308,13 @@ const OrderManagement = () => {
           return {
             id: (data.id || "").trim().toUpperCase(),
             driver: data.driver || "",
+            type: data.type || "",
+            make: data.make || "",
+            model: data.model || "",
+            licensePlate: data.licensePlate || "",
+            status: data.status || "",
+            location: data.location || "",
+            capacityTonnage: data.capacityTonnage || "",
           };
         }).filter((vehicle) => vehicle.id);
         setFleetVehicles(nextFleetVehicles);
@@ -354,36 +434,20 @@ const OrderManagement = () => {
     setIsBookingPreviewOpen(false);
     setSelectedBooking(null);
     setSelectedTruckId("");
+    setSendInvoiceChecked(false);
   };
 
-  const sendInvoice = async () => {
-    if (!selectedBooking?.id) return;
-    setBusyRow(`invoice-${selectedBooking.id}`);
-    try {
-      await updateDoc(doc(db, COLLECTIONS.customers, selectedBooking.id), {
-        status: "Invoice sent",
-        updatedAt: serverTimestamp(),
-      });
-      toast.success(`Invoice sent for order ${selectedBooking.orderNo}.`);
-      closeBookingPreview();
-    } catch (invoiceError) {
-      toast.error(invoiceError?.message || "Failed to send invoice.");
-    } finally {
-      setBusyRow("");
-    }
-  };
-
-  const assignTruck = async () => {
+  const bookShipment = async () => {
     if (!selectedBooking?.id) return;
     if (!selectedTruckId) {
       toast.error("No truck is attached to this order yet.");
       return;
     }
-    setBusyRow(`assign-${selectedBooking.id}`);
+    setBusyRow(`book-${selectedBooking.id}`);
     try {
       await updateDoc(doc(db, COLLECTIONS.customers, selectedBooking.id), {
         truckId: selectedTruckId,
-        status: "Truck Assigned",
+        status: sendInvoiceChecked ? "Invoice sent" : "Truck Assigned",
         updatedAt: serverTimestamp(),
       });
       await createAssignmentNotification({
@@ -393,10 +457,25 @@ const OrderManagement = () => {
         truckId: selectedTruckId,
         type: "assignment_created",
       });
-      toast.success(`Truck assigned for order ${selectedBooking.orderNo}.`);
+      await createOpsUserNotification({
+        title: sendInvoiceChecked ? "Shipment Booked And Invoice Sent" : "Shipment Booked",
+        message: sendInvoiceChecked
+          ? `Order ${selectedBooking.orderNo} has been booked and your invoice is now available.`
+          : `Order ${selectedBooking.orderNo} has been booked and assigned to truck ${selectedTruckId.toUpperCase()}.`,
+        customerUid: selectedBooking.customerUid || "",
+        customerEmail: selectedBooking.customerEmail || "",
+        orderNo: selectedBooking.orderNo,
+        quotationNo: selectedBooking.quotationNo || "",
+        type: sendInvoiceChecked ? "shipment_booked_invoice_sent" : "shipment_booked",
+      });
+      toast.success(
+        sendInvoiceChecked
+          ? `Shipment booked and invoice sent for order ${selectedBooking.orderNo}.`
+          : `Shipment booked for order ${selectedBooking.orderNo}.`,
+      );
       closeBookingPreview();
-    } catch (assignError) {
-      toast.error(assignError?.message || "Failed to assign truck.");
+    } catch (bookingError) {
+      toast.error(bookingError?.message || "Failed to book shipment.");
     } finally {
       setBusyRow("");
     }
@@ -540,7 +619,7 @@ const OrderManagement = () => {
                       : "bg-slate-900/60 text-slate-300 hover:bg-slate-800"
                   }`}
                 >
-                  Order Creation & Truck Assignment
+                  Shipment Management
                 </button>
                 <button
                   type="button"
@@ -584,6 +663,7 @@ const OrderManagement = () => {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                       <th className="px-3 py-2">Order No</th>
+                      <th className="px-3 py-2">Timestamp</th>
                       <th className="px-3 py-2">Customer</th>
                       <th className="px-3 py-2">Cargo</th>
                       <th className="px-3 py-2">Weight</th>
@@ -595,13 +675,14 @@ const OrderManagement = () => {
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan={8} className="px-3 py-4 text-slate-500">Loading...</td></tr>
+                      <tr><td colSpan={9} className="px-3 py-4 text-slate-500">Loading...</td></tr>
                     ) : filteredCustomers.length === 0 ? (
-                      <tr><td colSpan={8} className="px-3 py-4 text-slate-500">No shipment orders.</td></tr>
+                      <tr><td colSpan={9} className="px-3 py-4 text-slate-500">No shipment orders.</td></tr>
                     ) : (
                       filteredCustomers.map((row) => (
                         <tr key={row.id} className="border-t border-slate-800">
                           <td className="px-3 py-3 text-white">{row.orderNo}</td>
+                          <td className="px-3 py-3 text-slate-400">{formatTimestamp(row)}</td>
                           <td className="px-3 py-3 text-slate-300">{row.customerName}</td>
                           <td className="px-3 py-3 text-slate-300">{row.cargo || "Not specified"}</td>
                           <td className="px-3 py-3 text-slate-400">{row.weight || "Not specified"}</td>
@@ -611,15 +692,18 @@ const OrderManagement = () => {
                            <td className="px-3 py-3">
                              <div className="flex items-center gap-2 flex-wrap">
                                <button type="button" onClick={() => openBookingPreview(row)} disabled={busyRow === row.id} className="inline-flex items-center gap-1 rounded-md border border-orange-500/40 px-2 py-1 text-xs text-orange-300 hover:bg-orange-500/10">
-                                 <Trash2 size={12} /> Book Shipment
-                               </button>
-                               {row.status === "Invoice sent" ? (
-                                 <button type="button" onClick={() => setSelectedInvoice(row)} className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-100 hover:bg-slate-800">
-                                   <Printer size={12} /> Print
-                                 </button>
-                               ) : null}
-                             </div>
-                           </td>
+                                  <Trash2 size={12} /> Book Shipment
+                                </button>
+                                {row.status === "Invoice sent" ? (
+                                  <button type="button" onClick={() => setSelectedInvoice(row)} className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-100 hover:bg-slate-800">
+                                    <Printer size={12} /> Print
+                                  </button>
+                                ) : null}
+                                <button type="button" onClick={() => deleteCustomer(row.id)} disabled={busyRow === row.id} className="inline-flex items-center gap-1 rounded-md border border-rose-500/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10 disabled:opacity-60">
+                                  <Trash2 size={12} /> Delete
+                                </button>
+                              </div>
+                            </td>
                         </tr>
                       )))}
                   </tbody>
@@ -649,6 +733,7 @@ const OrderManagement = () => {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                       <th className="px-3 py-2">Order No</th>
+                      <th className="px-3 py-2">Timestamp</th>
                       <th className="px-3 py-2">Truck ID</th>
                       <th className="px-3 py-2">Current Location</th>
                       <th className="px-3 py-2">ETA</th>
@@ -656,13 +741,14 @@ const OrderManagement = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((row) => (
+                    {sortedOrders.map((row) => (
                       <tr key={row.id} className="border-t border-slate-800">
                         <td className="px-3 py-3 text-white">
                           {editingOrderId === row.id ? (
                             <input value={editOrder.orderNo} onChange={(e) => setEditOrder((p) => ({ ...p, orderNo: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
                           ) : row.orderNo}
                         </td>
+                        <td className="px-3 py-3 text-slate-400">{formatTimestamp(row)}</td>
                         <td className="px-3 py-3 text-slate-300">
                           {editingOrderId === row.id ? (
                             <input value={editOrder.truckId} onChange={(e) => setEditOrder((p) => ({ ...p, truckId: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
@@ -724,6 +810,7 @@ const OrderManagement = () => {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                       <th className="px-3 py-2">Delivery No</th>
+                      <th className="px-3 py-2">Timestamp</th>
                       <th className="px-3 py-2">Order No</th>
                       <th className="px-3 py-2">Confirmation</th>
                       <th className="px-3 py-2">Feedback</th>
@@ -731,13 +818,14 @@ const OrderManagement = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {supportTickets.map((row) => (
+                    {sortedSupportTickets.map((row) => (
                         <tr key={row.id} className="border-t border-slate-800">
                           <td className="px-3 py-3 text-white">
                             {editingSupportId === row.id ? (
                               <input value={editSupport.deliveryNo} onChange={(e) => setEditSupport((p) => ({ ...p, deliveryNo: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
                             ) : row.deliveryNo}
                           </td>
+                          <td className="px-3 py-3 text-slate-400">{formatTimestamp(row)}</td>
                           <td className="px-3 py-3 text-slate-300">
                             {editingSupportId === row.id ? (
                               <input value={editSupport.orderNo} onChange={(e) => setEditSupport((p) => ({ ...p, orderNo: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
@@ -780,7 +868,7 @@ const OrderManagement = () => {
 
             {isCustomerModalOpen ? (
               <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
-                <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
+                <div className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-white">Create Order</h3>
                     <button type="button" onClick={() => setIsCustomerModalOpen(false)} className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800">Close</button>
@@ -866,7 +954,8 @@ const OrderManagement = () => {
                     </div>
                     <button type="button" onClick={closeBookingPreview} className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800">Close</button>
                   </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <div className="mt-4 max-h-[68vh] overflow-y-auto pr-3">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     {[
                       ["Order No", selectedBooking.orderNo],
                       ["Customer", selectedBooking.customerName],
@@ -893,18 +982,40 @@ const OrderManagement = () => {
                       </select>
                     </div>
                     <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Driver Name</p>
-                      <p className="mt-2 text-sm font-semibold text-white">{selectedTruck?.driver || "No driver linked"}</p>
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Selected Vehicle</p>
+                      {selectedTruck ? (
+                        <div className="mt-2 space-y-2 text-sm text-slate-300">
+                          <p className="font-semibold text-white">
+                            {[selectedTruck.make, selectedTruck.model].filter(Boolean).join(" ")}
+                            {selectedTruck.type ? ` (${selectedTruck.type})` : ""}
+                          </p>
+                          <p>Driver: <span className="font-semibold text-white">{selectedTruck.driver || "No driver linked"}</span></p>
+                          <p>Plate No: <span className="font-semibold text-white">{selectedTruck.licensePlate || "Not set"}</span></p>
+                          <p>Status: <span className="font-semibold text-white">{selectedTruck.status || "Not set"}</span></p>
+                          <p>Location: <span className="font-semibold text-white">{selectedTruck.location || "Not reporting"}</span></p>
+                          <p>Capacity: <span className="font-semibold text-white">{selectedTruck.capacityTonnage ? `${selectedTruck.capacityTonnage} tons` : "Not set"}</span></p>
+                        </div>
+                      ) : (
+                        <p className="mt-2 text-sm font-semibold text-white">No vehicle selected</p>
+                      )}
                     </div>
                   </div>
-                  {!selectedTruckId ? <p className="mt-4 text-sm text-amber-300">Select a truck ID to enable assignment and preview the assigned driver.</p> : null}
+                  <label className="mt-4 flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-200">
+                    <input
+                      type="checkbox"
+                      checked={sendInvoiceChecked}
+                      onChange={(event) => setSendInvoiceChecked(event.target.checked)}
+                      disabled={busyRow === `book-${selectedBooking.id}`}
+                      className="h-4 w-4 rounded border-orange-400 bg-slate-950 text-orange-500 focus:ring-orange-500"
+                    />
+                    <span>Send invoice to client together with the shipment order</span>
+                  </label>
+                  {!selectedTruckId ? <p className="mt-4 text-sm text-amber-300">Select a truck ID to enable shipment booking and preview the assigned driver.</p> : null}
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                    <button type="button" onClick={sendInvoice} disabled={busyRow === `invoice-${selectedBooking.id}` || busyRow === `assign-${selectedBooking.id}`} className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-slate-800 disabled:opacity-60">
-                      {busyRow === `invoice-${selectedBooking.id}` ? "Sending..." : "Send Invoice"}
+                    <button type="button" onClick={bookShipment} disabled={!selectedTruckId || busyRow === `book-${selectedBooking.id}`} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
+                      {busyRow === `book-${selectedBooking.id}` ? "Booking..." : "Book Shipment"}
                     </button>
-                    <button type="button" onClick={assignTruck} disabled={!selectedTruckId || busyRow === `invoice-${selectedBooking.id}` || busyRow === `assign-${selectedBooking.id}`} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
-                      {busyRow === `assign-${selectedBooking.id}` ? "Assigning..." : "Assign Truck"}
-                    </button>
+                  </div>
                   </div>
                 </div>
               </div>

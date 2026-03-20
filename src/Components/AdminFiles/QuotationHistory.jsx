@@ -11,18 +11,18 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { ClipboardCheck, ClipboardList, Eye, Trash2 } from "lucide-react";
+import { ClipboardList, Eye, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
-import { app } from "../../Auth/firebase";
-import { createNotificationRecord } from "../../Auth/notificationUtils.js";
-import NavBar from "../../Basics/NavBar.jsx";
-import Sidebar from "../../Basics/Sidebar.jsx";
+import { app } from "../Auth/firebase.js";
+import NavBar from "../Basics/NavBar.jsx";
+import Sidebar from "../Basics/Sidebar.jsx";
 
 const db = getFirestore(app);
 const resumableQuotationStatuses = new Set([
   "Quotation Drafted",
   "Quotation Sent and Pending Client Review",
   "Quotation Under Negotiation",
+  "Quotation Accepted",
 ]);
 
 const formatLocation = (location) => {
@@ -237,7 +237,7 @@ const calculateQuoteBreakdown = (draft) => {
   };
 };
 
-const PendingQuotations = () => {
+const QuotationHistory = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [quotations, setQuotations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -250,7 +250,6 @@ const PendingQuotations = () => {
   const [quoteDraft, setQuoteDraft] = useState(null);
   const [breakdownPreview, setBreakdownPreview] = useState(null);
   const [quotationPreview, setQuotationPreview] = useState(null);
-  const [sendQuotationChecked, setSendQuotationChecked] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
 
   const loadQuotations = useCallback(async () => {
@@ -459,7 +458,6 @@ const PendingQuotations = () => {
           ? { ...buildQuoteDraft(resolvedQuotation), ...resolvedQuotation.pricingInputs }
           : buildQuoteDraft(resolvedQuotation),
       );
-      setSendQuotationChecked(false);
       setQuoteModalOpen(true);
     } catch (error) {
       toast.error(error?.message || "Failed to open quotation details.");
@@ -475,7 +473,6 @@ const PendingQuotations = () => {
     setQuoteModalOpen(false);
     setSelectedQuotation(null);
     setQuoteDraft(null);
-    setSendQuotationChecked(false);
   };
 
   const openBreakdownPreview = (quotation) => {
@@ -516,14 +513,6 @@ const PendingQuotations = () => {
         quotationBreakdown: quoteBreakdown,
         quoteTotal: quoteBreakdown.total,
       });
-      await createNotificationRecord({
-        title: "Quotation Sent",
-        message: `Your quotation ${selectedQuotation.quotationNo || selectedQuotation.id} is ready for review.`,
-        targetUid: selectedQuotation.customerUid || "",
-        targetEmail: selectedQuotation.customerEmail || "",
-        type: "quotation_sent",
-        quotationNo: selectedQuotation.quotationNo || "",
-      });
       await loadQuotations();
       closeQuoteModal();
       toast.success("Quotation confirmed and generated successfully.");
@@ -563,7 +552,7 @@ const PendingQuotations = () => {
 
   const filteredQuotations = useMemo(() => {
     const visibleQuotations = quotations.filter(
-      (quotation) => quotation.status !== "SAVE" && quotation.status !== "Quotation Accepted",
+      (quotation) => quotation.status === "Quotation Accepted",
     );
     const query = searchQuery.trim().toLowerCase();
     const sortByNewest = (items) => [...items].sort(
@@ -606,7 +595,7 @@ const PendingQuotations = () => {
           <div className="mx-auto max-w-7xl space-y-6">
             <header className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Quotations</p>
-              <h1 className="mt-2 text-3xl font-bold text-white">Pending Quotation Requests</h1>
+              <h1 className="mt-2 text-3xl font-bold text-white">Quotation History</h1>
               {/*<p className="mt-2 text-sm text-slate-400">
                 Review all customer quotation submissions saved in the <span className="text-orange-400">Quotations</span> collection.
               </p>*/}
@@ -647,7 +636,7 @@ const PendingQuotations = () => {
                       {filteredQuotations.length} request{filteredQuotations.length === 1 ? "" : "s"}
                     </p>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="max-h-[58vh] overflow-auto pr-3">
                     <table className="min-w-[1320px] w-full text-left">
                       <thead className="bg-slate-900/80">
                         <tr className="border-b border-slate-800">
@@ -934,30 +923,16 @@ const PendingQuotations = () => {
                                      >
                                        <Eye size={16} />
                                      </button>
-                                      {!isPendingClientReview ? (
-                                        <button
-                                           type="button"
-                                           title={isAccepted ? (hasOrder ? "Make Order Again" : "Make Order") : "Confirm Quote"}
-                                           aria-label={isAccepted ? (hasOrder ? "Make Order Again" : "Make Order") : "Confirm Quote"}
-                                           onClick={() => (
-                                             isAccepted ? makeOrderFromQuotation(quotation) : openQuoteModal(quotation)
-                                           )}
-                                          disabled={Boolean(editingQuotationId) || busyRow === quotation.id}
-                                          className="flex h-10 w-10 items-center justify-center rounded-md border border-orange-500/40 text-orange-300 hover:bg-orange-500/10 disabled:opacity-60"
-                                        >
-                                          <ClipboardCheck size={16} />
-                                        </button>
-                                      ) : null}
-                                     {/*<button
-                                       type="button"
-                                       title="Delete"
-                                       aria-label="Delete"
-                                       onClick={() => deleteQuotation(quotation.id)}
-                                       disabled={busyRow === quotation.id}
-                                       className="flex h-10 w-10 items-center justify-center rounded-md border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 disabled:opacity-60"
-                                     >
-                                       <Trash2 size={16} />
-                                     </button>*/}
+                                      <button
+                                        type="button"
+                                        title="Delete"
+                                        aria-label="Delete"
+                                        onClick={() => openDeleteModal(quotation)}
+                                        disabled={busyRow === "delete-quotation"}
+                                        className="flex h-10 w-10 items-center justify-center rounded-md border border-rose-500/40 text-rose-300 hover:bg-rose-500/10 disabled:opacity-60"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
                                   </>
                                 )}
                               </div>
@@ -1133,30 +1108,18 @@ const PendingQuotations = () => {
                   >
                     {busyRow === "save-quotation-draft" ? "Saving..." : "Save Quotation Draft"}
                   </button>
-                  <label className="flex items-center gap-3 rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm font-semibold text-white">
-                    <input
-                      type="checkbox"
-                      checked={sendQuotationChecked}
-                      onChange={async (event) => {
-                        const isChecked = event.target.checked;
-                        setSendQuotationChecked(isChecked);
-                        if (!isChecked) {
-                          return;
-                        }
-                        await confirmQuotation();
-                        setSendQuotationChecked(false);
-                      }}
-                      disabled={busyRow === "confirm-quotation" || busyRow === "save-quotation-draft"}
-                      className="h-4 w-4 rounded border-orange-400 bg-slate-950 text-orange-500 focus:ring-orange-500"
-                    />
-                    <span>
-                      {busyRow === "confirm-quotation"
-                        ? "Sending..."
-                        : selectedQuotation.status === "Quotation Sent and Pending Client Review"
-                          ? "Send quotation"
-                          : "Confirm and Send quotation"}
-                    </span>
-                  </label>
+                  <button
+                    type="button"
+                    onClick={confirmQuotation}
+                    disabled={busyRow === "confirm-quotation" || busyRow === "save-quotation-draft"}
+                    className="w-full rounded-lg bg-orange-600 px-4 py-3 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-70"
+                  >
+                    {busyRow === "confirm-quotation"
+                      ? "Sending..."
+                      : selectedQuotation.status === "Quotation Sent and Pending Client Review"
+                        ? "Send quotation"
+                        : "Confirm quotation"}
+                  </button>
                 </div>
               </div>
             </div>
@@ -1236,41 +1199,6 @@ const PendingQuotations = () => {
           </div>
         </div>
       ) : null}
-      {deleteTarget ? (
-        <div className="fixed inset-0 z-[145] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-            <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Delete quotation</p>
-            <h3 className="mt-3 text-xl font-bold uppercase tracking-[0.08em] text-white">
-              {deleteTarget.quotationNo || "Quotation record"}
-            </h3>
-            <p className="mt-4 text-sm leading-6 text-slate-400">
-              This will permanently remove the quotation record for{" "}
-              <span className="font-semibold text-slate-200">
-                {deleteTarget.customerName || "this customer"}
-              </span>
-              . This action cannot be undone.
-            </p>
-            <div className="mt-6 flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={closeDeleteModal}
-                disabled={busyRow === "delete-quotation"}
-                className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300 hover:bg-slate-800 disabled:opacity-60"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={deleteQuotation}
-                disabled={busyRow === "delete-quotation"}
-                className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white hover:bg-rose-700 disabled:opacity-60"
-              >
-                {busyRow === "delete-quotation" ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : null}
       {breakdownPreview ? (
         <div className="fixed inset-0 z-[145] flex items-center justify-center bg-black/70 p-4">
           <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-2xl">
@@ -1323,8 +1251,43 @@ const PendingQuotations = () => {
           </div>
         </div>
       ) : null}
+      {deleteTarget ? (
+        <div className="fixed inset-0 z-[145] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+            <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Delete quotation</p>
+            <h3 className="mt-3 text-xl font-bold uppercase tracking-[0.08em] text-white">
+              {deleteTarget.quotationNo || "Quotation record"}
+            </h3>
+            <p className="mt-4 text-sm leading-6 text-slate-400">
+              This will permanently remove the quotation history record for{" "}
+              <span className="font-semibold text-slate-200">
+                {deleteTarget.customerName || "this customer"}
+              </span>
+              . This action cannot be undone.
+            </p>
+            <div className="mt-6 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeDeleteModal}
+                disabled={busyRow === "delete-quotation"}
+                className="rounded-lg border border-slate-700 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300 hover:bg-slate-800 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={deleteQuotation}
+                disabled={busyRow === "delete-quotation"}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-white hover:bg-rose-700 disabled:opacity-60"
+              >
+                {busyRow === "delete-quotation" ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };
 
-export default PendingQuotations;
+export default QuotationHistory;

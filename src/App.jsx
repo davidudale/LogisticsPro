@@ -34,6 +34,7 @@ import CustomersShipment from "./Components/Customers/CustomersShipment.jsx";
 import ShipmentOrdersSection from "./Components/Customers/ShipmentOrdersSection.jsx";
 import ShipmentQuotationsSection from "./Components/Customers/ShipmentQuotationsSection.jsx";
 import PendingQuotations from "./Components/AdminFiles/CustomerManagement/PendingQuotations.jsx";
+import QuotationHistory from "./Components/AdminFiles/QuotationHistory.jsx";
 
 const App = () => {
   return (
@@ -70,6 +71,9 @@ const App = () => {
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route path="/admin/pendingQuotation" element={<PendingQuotations />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+          <Route path="/admin/quotationsHistory" element={<QuotationHistory />} />
         </Route>
         
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>

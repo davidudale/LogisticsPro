@@ -15,6 +15,7 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { toast } from "react-toastify";
 import { app } from "../Auth/firebase";
 import { useAuth } from "../Auth/AuthContext.jsx";
+import { createNotificationRecord } from "../Auth/notificationUtils.js";
 import NavBar from "../Basics/NavBar.jsx";
 import Sidebar from "../Basics/Sidebar.jsx";
 
@@ -180,7 +181,7 @@ const CustomersShipment = () => {
           origin: targetQuotation.origin || {},
           destination: targetQuotation.destination || {},
           deliveryAddress: targetQuotation.deliveryAddress || formatLocation(targetQuotation.destination),
-          status: "New Order",
+          status: "Shipment Booking - In Progress",
           quoteTotal: targetQuotation.quoteTotal || 0,
           quotationBreakdown: targetQuotation.quotationBreakdown || {},
           source: "quotation_acceptance",
@@ -195,6 +196,18 @@ const CustomersShipment = () => {
         customerNegotiationReason: decision === "reject" ? reason.trim() : "",
         customerDecisionAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
+      });
+
+      await createNotificationRecord({
+        title: decision === "accept" ? "Quotation Accepted" : "Quotation Under Negotiation",
+        message: decision === "accept"
+          ? `${targetQuotation.customerName || "Customer"} accepted quotation ${targetQuotation.quotationNo || quotationId}.`
+          : `${targetQuotation.customerName || "Customer"} requested negotiation on quotation ${targetQuotation.quotationNo || quotationId}${reason.trim() ? `: ${reason.trim()}` : "."}`,
+        targetRole: "admin",
+        type: decision === "accept" ? "quotation_accepted" : "quotation_negotiation_requested",
+        quotationNo: targetQuotation.quotationNo || "",
+        customerUid: user?.uid || targetQuotation.customerUid || "",
+        customerEmail: user?.email || targetQuotation.customerEmail || "",
       });
 
       setQuotations((prev) =>
@@ -237,7 +250,7 @@ const CustomersShipment = () => {
               destination: targetQuotationRecord.destination || {},
               deliveryAddress:
                 targetQuotationRecord.deliveryAddress || formatLocation(targetQuotationRecord.destination),
-              status: "New Order",
+              status: "Shipment Booking - In Progress",
               quoteTotal: targetQuotationRecord.quoteTotal || 0,
               quotationBreakdown: targetQuotationRecord.quotationBreakdown || {},
               source: "quotation_acceptance",

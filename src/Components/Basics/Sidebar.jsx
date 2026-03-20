@@ -28,11 +28,11 @@ const roleLinks = {
   opsuser: [
     { label: "Dashboard", to: "/opsuser", icon: LayoutDashboard },
     {
-      label: "My Shipments",
+      label: "My Quotations",
       icon: Package,
       children: [
         {
-          label: "My Quotations",
+          label: "My Shipments",
           to: "/opsuser/shipments/quotations",
           icon: FileText,
         },
@@ -79,10 +79,16 @@ const roleLinks = {
               to: "/admin/pendingQuotation",
               icon: ClipboardList,
             },
+            
 
             {
               label: "Shipment Orders",
               to: "/admin/orders",
+              icon: ClipboardList,
+            },
+            {
+              label: "Quotations History",
+              to: "/admin/quotationsHistory",
               icon: ClipboardList,
             },
           ],

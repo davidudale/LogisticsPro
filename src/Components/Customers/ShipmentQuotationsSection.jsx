@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Check, Plus, ReceiptText, X } from "lucide-react";
 import { Link, useOutletContext } from "react-router-dom";
 
@@ -17,6 +17,27 @@ const negotiationReasons = [
   "Other",
 ];
 
+const getTimestampValue = (value) => {
+  if (!value) return 0;
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
+  const parsedValue = new Date(value).getTime();
+  return Number.isNaN(parsedValue) ? 0 : parsedValue;
+};
+
+const formatTimestamp = (quotation) => {
+  const rawValue = quotation.updatedAt || quotation.createdAt;
+  const timestampValue = getTimestampValue(rawValue);
+  if (!timestampValue) return "Not available";
+  return new Intl.DateTimeFormat("en-NG", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestampValue));
+};
+
 const ShipmentQuotationsSection = () => {
   const {
     loading,
@@ -32,6 +53,14 @@ const ShipmentQuotationsSection = () => {
   const [negotiationModal, setNegotiationModal] = useState(null);
   const [selectedNegotiationReason, setSelectedNegotiationReason] = useState("");
   const [negotiationReason, setNegotiationReason] = useState("");
+  const sortedQuotations = useMemo(
+    () => [...filteredQuotations].sort(
+      (left, right) =>
+        getTimestampValue(right.updatedAt || right.createdAt)
+        - getTimestampValue(left.updatedAt || left.createdAt),
+    ),
+    [filteredQuotations],
+  );
 
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-5">
@@ -64,12 +93,13 @@ const ShipmentQuotationsSection = () => {
         </div>
       ) : (
         <div className="mt-4 overflow-hidden rounded-2xl border border-slate-800">
-          <div className="overflow-x-auto">
+          <div className="max-h-[58vh] overflow-auto pr-3">
             <table className="min-w-[1400px] w-full text-left text-sm">
               <thead className="bg-slate-900/80">
                 <tr className="border-b border-slate-800 text-xs uppercase tracking-[0.12em] text-slate-400">
                   <th className="px-3 py-3">Quotation No</th>
-                 <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3">Timestamp</th>
+                  <th className="px-3 py-3">Status</th>
                   <th className="px-3 py-3">Origin</th>
                   <th className="px-3 py-3">Destination</th>
                   <th className="px-3 py-3">Cargo</th>
@@ -81,7 +111,7 @@ const ShipmentQuotationsSection = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredQuotations.map((quotation) => {
+                {sortedQuotations.map((quotation) => {
                   const canRespond = quotation.status === "Quotation Sent and Pending Client Review";
                   const breakdown = quotation.quotationBreakdown || {};
                   const canViewPricing = visiblePricingStatuses.has(quotation.status);
@@ -97,6 +127,9 @@ const ShipmentQuotationsSection = () => {
                         <p className="mt-1 text-xs text-slate-500">
                           {quotation.customerName || user?.displayName || "Customer"}
                         </p>
+                      </td>
+                      <td className="px-3 py-4 text-slate-300">
+                        {formatTimestamp(quotation)}
                       </td>
                       <td className="px-3 py-4">
                         <span className="inline-flex rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-orange-300">

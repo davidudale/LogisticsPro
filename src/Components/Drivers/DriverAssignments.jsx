@@ -9,6 +9,26 @@ import Sidebar from "../Basics/Sidebar.jsx";
 
 const db = getFirestore(app);
 
+const getTimestampValue = (value) => {
+  if (!value) return 0;
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
+  const parsedValue = new Date(value).getTime();
+  return Number.isNaN(parsedValue) ? 0 : parsedValue;
+};
+
+const formatTimestamp = (record) => {
+  const timestampValue = getTimestampValue(record.updatedAt || record.createdAt);
+  if (!timestampValue) return "Not available";
+  return new Intl.DateTimeFormat("en-NG", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestampValue));
+};
+
 const DriverAssignments = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -46,11 +66,16 @@ const DriverAssignments = () => {
 
   const filteredAssignments = useMemo(() => {
     const value = queryValue.trim().toLowerCase();
+    const sortByNewest = (items) => [...items].sort(
+      (left, right) =>
+        getTimestampValue(right.updatedAt || right.createdAt)
+        - getTimestampValue(left.updatedAt || left.createdAt),
+    );
     if (!value) {
-      return assignments;
+      return sortByNewest(assignments);
     }
 
-    return assignments.filter((assignment) =>
+    return sortByNewest(assignments.filter((assignment) =>
       [
         assignment.orderNo,
         assignment.customerName,
@@ -60,7 +85,7 @@ const DriverAssignments = () => {
       ]
         .filter(Boolean)
         .some((item) => item.toString().toLowerCase().includes(value)),
-    );
+    ));
   }, [assignments, queryValue]);
 
   return (
@@ -122,6 +147,7 @@ const DriverAssignments = () => {
                       <thead className="bg-slate-900/80">
                         <tr className="border-b border-slate-800 text-xs uppercase tracking-[0.12em] text-slate-400">
                           <th className="px-3 py-3">Order No</th>
+                          <th className="px-3 py-3">Timestamp</th>
                           <th className="px-3 py-3">Customer</th>
                           <th className="px-3 py-3">Truck</th>
                           <th className="px-3 py-3">Delivery Address</th>
@@ -132,6 +158,7 @@ const DriverAssignments = () => {
                         {filteredAssignments.map((assignment) => (
                           <tr key={assignment.id} className="border-b border-slate-800/80 hover:bg-slate-900/30">
                             <td className="px-3 py-4 font-semibold text-white">{assignment.orderNo || "Order"}</td>
+                            <td className="px-3 py-4 text-slate-400">{formatTimestamp(assignment)}</td>
                             <td className="px-3 py-4 text-slate-300">{assignment.customerName || "Customer"}</td>
                             <td className="px-3 py-4 text-slate-300">
                               <span className="inline-flex items-center gap-2">

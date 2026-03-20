@@ -62,7 +62,29 @@ const mapDriverRecord = (item) => {
     certificationStatus: data.certificationStatus || "Compliant",
     incidentStatus: data.incidentStatus || "Clear",
     notes: data.notes || "",
+    createdAt: data.createdAt || null,
+    updatedAt: data.updatedAt || null,
   };
+};
+
+const getTimestampValue = (value) => {
+  if (!value) return 0;
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
+  const parsedValue = new Date(value).getTime();
+  return Number.isNaN(parsedValue) ? 0 : parsedValue;
+};
+
+const formatTimestamp = (record) => {
+  const timestampValue = getTimestampValue(record.updatedAt || record.createdAt);
+  if (!timestampValue) return "Not available";
+  return new Intl.DateTimeFormat("en-NG", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestampValue));
 };
 
 const DriverManagement = () => {
@@ -110,6 +132,14 @@ const DriverManagement = () => {
 
   const pendingAssignments = useMemo(
     () => drivers.filter((driver) => driver.assignmentStatus === "Pending Assignment").length,
+    [drivers],
+  );
+  const sortedDrivers = useMemo(
+    () => [...drivers].sort(
+      (left, right) =>
+        getTimestampValue(right.updatedAt || right.createdAt)
+        - getTimestampValue(left.updatedAt || left.createdAt),
+    ),
     [drivers],
   );
 
@@ -312,6 +342,7 @@ const DriverManagement = () => {
                     <thead>
                       <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                         <th className="px-3 py-2">Driver</th>
+                        <th className="px-3 py-2">Timestamp</th>
                         <th className="px-3 py-2">Email</th>
                         <th className="px-3 py-2">Phone</th>
                         <th className="px-3 py-2">License No</th>
@@ -323,20 +354,21 @@ const DriverManagement = () => {
                     <tbody>
                       {isLoading ? (
                         <tr>
-                          <td colSpan={7} className="px-3 py-4 text-slate-500">
+                          <td colSpan={8} className="px-3 py-4 text-slate-500">
                             Loading drivers...
                           </td>
                         </tr>
-                      ) : drivers.length === 0 ? (
+                      ) : sortedDrivers.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="px-3 py-4 text-slate-500">
+                          <td colSpan={8} className="px-3 py-4 text-slate-500">
                             No drivers found yet.
                           </td>
                         </tr>
                       ) : (
-                        drivers.map((driver) => (
+                        sortedDrivers.map((driver) => (
                           <tr key={driver.firestoreId} className="border-t border-slate-800">
                             <td className="px-3 py-3 font-semibold text-white">{driver.fullName}</td>
+                            <td className="px-3 py-3 text-slate-400">{formatTimestamp(driver)}</td>
                             <td className="px-3 py-3 text-slate-300">{driver.email || "Not set"}</td>
                             <td className="px-3 py-3 text-slate-300">{driver.phone || "Not set"}</td>
                             <td className="px-3 py-3 text-slate-400">{driver.licenseNo}</td>

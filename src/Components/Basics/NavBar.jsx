@@ -1,12 +1,41 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { LogOut, Menu, X } from "lucide-react";
+import { Bell, LogOut, Menu, X } from "lucide-react";
+import { collection, getFirestore, onSnapshot, orderBy, query } from "firebase/firestore";
+import { app } from "../Auth/firebase.js";
 import { useAuth } from "../Auth/AuthContext.jsx";
+
+const db = getFirestore(app);
+
+const normalizeValue = (value) => (value || "").toString().trim().toLowerCase();
+
+const getTimestampValue = (value) => {
+  if (!value) return 0;
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
+  const parsedValue = new Date(value).getTime();
+  return Number.isNaN(parsedValue) ? 0 : parsedValue;
+};
+
+const formatNotificationTime = (value) => {
+  const timestampValue = getTimestampValue(value);
+  if (!timestampValue) return "Now";
+  return new Intl.DateTimeFormat("en-NG", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestampValue));
+};
 
 const NavBar = ({ title = "Dashboard", onToggleSidebar }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [readNotificationIds, setReadNotificationIds] = useState([]);
+  const notificationsPanelRef = useRef(null);
 
   const handleLogout = async () => {
     await logout();
@@ -15,6 +44,87 @@ const NavBar = ({ title = "Dashboard", onToggleSidebar }) => {
 
   const userName =
     user?.displayName || user?.email?.split("@")[0] || user?.role || "User";
+
+  const assignedTruckId = useMemo(
+    () => normalizeValue(
+      user?.profile?.truckId || user?.profile?.vehicleId || user?.profile?.assignedTruckId,
+    ),
+    [user?.profile],
+  );
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setNotifications([]);
+      setReadNotificationIds([]);
+      return undefined;
+    }
+
+    const notificationsQuery = query(collection(db, "notifications"), orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(
+      notificationsQuery,
+      (snapshot) => {
+        const nextNotifications = snapshot.docs
+          .map((item) => ({ id: item.id, ...item.data() }))
+          .filter((notification) => {
+            const targetUid = normalizeValue(notification.targetUid);
+            const targetEmail = normalizeValue(notification.targetEmail);
+            const targetRole = normalizeValue(notification.targetRole);
+            const targetTruckId = normalizeValue(notification.targetTruckId);
+
+            return (
+              (targetUid && targetUid === normalizeValue(user.uid))
+              || (targetEmail && targetEmail === normalizeValue(user.email))
+              || (targetRole && targetRole === normalizeValue(user.role))
+              || (targetTruckId && assignedTruckId && targetTruckId === assignedTruckId)
+            );
+          })
+          .sort(
+            (left, right) =>
+              getTimestampValue(right.createdAt || right.updatedAt)
+              - getTimestampValue(left.createdAt || left.updatedAt),
+          )
+          .slice(0, 8);
+
+        setNotifications(nextNotifications);
+      },
+      (error) => {
+        console.error("Failed to load navbar notifications:", error);
+      },
+    );
+
+    return () => unsubscribe();
+  }, [assignedTruckId, user?.email, user?.role, user?.uid]);
+
+  useEffect(() => {
+    if (!notificationsOpen) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event) => {
+      if (!notificationsPanelRef.current?.contains(event.target)) {
+        setNotificationsOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => document.removeEventListener("mousedown", handlePointerDown);
+  }, [notificationsOpen]);
+
+  const unreadCount = notifications.filter(
+    (notification) => !readNotificationIds.includes(notification.id),
+  ).length;
+
+  const toggleNotifications = () => {
+    setNotificationsOpen((prev) => {
+      const nextState = !prev;
+      if (!prev) {
+        setReadNotificationIds((current) => [
+          ...new Set([...current, ...notifications.map((notification) => notification.id)]),
+        ]);
+      }
+      return nextState;
+    });
+  };
 
   return (
     <header className="sticky top-0 w-full border-b border-slate-800 bg-slate-900/50 backdrop-blur-md z-50">
@@ -43,6 +153,63 @@ const NavBar = ({ title = "Dashboard", onToggleSidebar }) => {
             </span>
             <span className="text-white text-xs font-medium">{userName}</span>
           </div>
+          <div className="relative" ref={notificationsPanelRef}>
+            <button
+              type="button"
+              onClick={toggleNotifications}
+              className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-950/70 text-slate-200 transition hover:border-orange-500/50 hover:bg-slate-900"
+              aria-label="Open notifications"
+              title="Notifications"
+            >
+              <Bell size={18} />
+              {unreadCount > 0 ? (
+                <span className="absolute -right-1 -top-1 min-w-[1.1rem] rounded-full bg-orange-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              ) : null}
+            </button>
+            {notificationsOpen ? (
+              <div className="absolute right-0 top-14 z-[90] w-[22rem] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/95 shadow-2xl">
+                <div className="border-b border-slate-800 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Notifications</p>
+                  <p className="mt-1 text-sm font-semibold text-white">
+                    {notifications.length ? "Latest updates" : "No notifications yet"}
+                  </p>
+                </div>
+                <div className="max-h-[24rem] overflow-y-auto">
+                  {notifications.length ? (
+                    notifications.map((notification) => {
+                      const isUnread = !readNotificationIds.includes(notification.id);
+                      return (
+                        <div
+                          key={notification.id}
+                          className={`border-b border-slate-800/80 px-4 py-3 ${
+                            isUnread ? "bg-orange-500/5" : "bg-transparent"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm font-semibold uppercase tracking-[0.08em] text-white">
+                              {notification.title || "LogisticsPro Notification"}
+                            </p>
+                            <span className="whitespace-nowrap text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                              {formatNotificationTime(notification.createdAt || notification.updatedAt)}
+                            </span>
+                          </div>
+                          <p className="mt-2 text-xs leading-5 text-slate-400">
+                            {notification.message || "You have a new update."}
+                          </p>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="px-4 py-6 text-sm text-slate-400">
+                      Notifications for your account, role, or assigned truck will show here.
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : null}
+          </div>
           <button
             onClick={handleLogout}
             className="bg-red-900/40 hover:bg-red-700 text-white px-4 py-1.5 rounded-sm text-xs font-bold uppercase tracking-widest transition-all flex items-center gap-2"
@@ -64,6 +231,46 @@ const NavBar = ({ title = "Dashboard", onToggleSidebar }) => {
 
       {isMenuOpen && (
         <div className="md:hidden border-t border-slate-800 bg-slate-900 p-4 space-y-4 flex flex-col">
+          <button
+            type="button"
+            onClick={toggleNotifications}
+            className="flex items-center justify-between rounded-xl border border-slate-700 bg-slate-950/60 px-4 py-3 text-left text-sm text-slate-200"
+          >
+            <span className="flex items-center gap-3">
+              <Bell size={16} />
+              Notifications
+            </span>
+            {unreadCount > 0 ? (
+              <span className="rounded-full bg-orange-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            ) : null}
+          </button>
+          {notificationsOpen ? (
+            <div className="max-h-[18rem] overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/60">
+              {notifications.length ? (
+                notifications.map((notification) => (
+                  <div key={notification.id} className="border-b border-slate-800/80 px-4 py-3 last:border-b-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white">
+                        {notification.title || "LogisticsPro Notification"}
+                      </p>
+                      <span className="whitespace-nowrap text-[10px] uppercase tracking-[0.14em] text-slate-500">
+                        {formatNotificationTime(notification.createdAt || notification.updatedAt)}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-slate-400">
+                      {notification.message || "You have a new update."}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div className="px-4 py-5 text-sm text-slate-400">
+                  Notifications for your account will appear here.
+                </div>
+              )}
+            </div>
+          ) : null}
           <div className="w-full text-left px-2 py-2 text-sm text-slate-300">
             {userName}
           </div>

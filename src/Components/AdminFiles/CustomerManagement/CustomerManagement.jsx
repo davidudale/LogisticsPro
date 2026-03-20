@@ -49,6 +49,26 @@ const emptySupportForm = {
   state: "",
 };
 
+const getTimestampValue = (value) => {
+  if (!value) return 0;
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
+  const parsedValue = new Date(value).getTime();
+  return Number.isNaN(parsedValue) ? 0 : parsedValue;
+};
+
+const formatTimestamp = (record) => {
+  const timestampValue = getTimestampValue(record.updatedAt || record.createdAt);
+  if (!timestampValue) return "Not available";
+  return new Intl.DateTimeFormat("en-NG", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestampValue));
+};
+
 const CustomerManagement = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -79,8 +99,13 @@ const CustomerManagement = () => {
 
   const filteredCustomers = useMemo(() => {
     const value = query.trim().toLowerCase();
-    if (!value) return customers;
-    return customers.filter(
+    const sortByNewest = (items) => [...items].sort(
+      (left, right) =>
+        getTimestampValue(right.updatedAt || right.createdAt)
+        - getTimestampValue(left.updatedAt || left.createdAt),
+    );
+    if (!value) return sortByNewest(customers);
+    return sortByNewest(customers.filter(
       (customer) =>
         customer.companyName.toLowerCase().includes(value) ||
         customer.contactName.toLowerCase().includes(value) ||
@@ -90,8 +115,26 @@ const CustomerManagement = () => {
         customer.companyRegistrationNumber.toLowerCase().includes(value) ||
         customer.industry.toLowerCase().includes(value) ||
         customer.companySize.toLowerCase().includes(value),
-    );
+    ));
   }, [customers, query]);
+
+  const sortedOrders = useMemo(
+    () => [...orders].sort(
+      (left, right) =>
+        getTimestampValue(right.updatedAt || right.createdAt)
+        - getTimestampValue(left.updatedAt || left.createdAt),
+    ),
+    [orders],
+  );
+
+  const sortedSupportTickets = useMemo(
+    () => [...supportTickets].sort(
+      (left, right) =>
+        getTimestampValue(right.updatedAt || right.createdAt)
+        - getTimestampValue(left.updatedAt || left.createdAt),
+    ),
+    [supportTickets],
+  );
 
   const loadCollections = async () => {
     setLoading(true);
@@ -140,8 +183,10 @@ const CustomerManagement = () => {
                 ? data.phoneVerified
                 : data.verification?.phone?.status === "verified",
             emailVerificationStatus: data.verification?.email?.status || "pending",
-            phoneVerificationStatus: data.verification?.phone?.status || "pending",
-          };
+             phoneVerificationStatus: data.verification?.phone?.status || "pending",
+             createdAt: data.createdAt || null,
+             updatedAt: data.updatedAt || null,
+           };
         }),
       );
 
@@ -154,6 +199,8 @@ const CustomerManagement = () => {
             customerName: data.customerName || data.customer || "",
             status: data.status || "Created",
             eta: data.eta || "TBD",
+            createdAt: data.createdAt || null,
+            updatedAt: data.updatedAt || null,
           };
         }),
       );
@@ -167,6 +214,8 @@ const CustomerManagement = () => {
             customerName: data.customerName || data.customer || "",
             topic: data.topic || "",
             state: data.state || "Open",
+            createdAt: data.createdAt || null,
+            updatedAt: data.updatedAt || null,
           };
         }),
       );
@@ -467,6 +516,7 @@ const CustomerManagement = () => {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                       <th className="px-3 py-2">Type</th>
+                      <th className="px-3 py-2">Timestamp</th>
                       <th className="px-3 py-2">Company</th>
                       <th className="px-3 py-2">Contact</th>
                       <th className="px-3 py-2">Role</th>
@@ -482,12 +532,13 @@ const CustomerManagement = () => {
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr><td colSpan={12} className="px-3 py-4 text-slate-500">Loading...</td></tr>
+                      <tr><td colSpan={13} className="px-3 py-4 text-slate-500">Loading...</td></tr>
                     ) : filteredCustomers.length === 0 ? (
-                      <tr><td colSpan={12} className="px-3 py-4 text-slate-500">No customer records.</td></tr>
+                      <tr><td colSpan={13} className="px-3 py-4 text-slate-500">No customer records.</td></tr>
                     ) : (
                       filteredCustomers.map((row) => (
                         <tr key={row.id} className="border-t border-slate-800">
+                          <td className="px-3 py-3 text-slate-400">{formatTimestamp(row)}</td>
                           <td className="px-3 py-3">
                             {editingCustomerId === row.id ? (
                               <select
@@ -612,6 +663,7 @@ const CustomerManagement = () => {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                       <th className="px-3 py-2">Order</th>
+                      <th className="px-3 py-2">Timestamp</th>
                       <th className="px-3 py-2">Customer</th>
                       <th className="px-3 py-2">Status</th>
                       <th className="px-3 py-2">ETA</th>
@@ -619,13 +671,14 @@ const CustomerManagement = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {orders.map((row) => (
+                    {sortedOrders.map((row) => (
                       <tr key={row.id} className="border-t border-slate-800">
                         <td className="px-3 py-3 text-white">
                           {editingOrderId === row.id ? (
                             <input value={editOrder.orderNo} onChange={(e) => setEditOrder((p) => ({ ...p, orderNo: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
                           ) : row.orderNo}
                         </td>
+                        <td className="px-3 py-3 text-slate-400">{formatTimestamp(row)}</td>
                         <td className="px-3 py-3 text-slate-300">
                           {editingOrderId === row.id ? (
                             <input value={editOrder.customerName} onChange={(e) => setEditOrder((p) => ({ ...p, customerName: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
@@ -687,6 +740,7 @@ const CustomerManagement = () => {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                       <th className="px-3 py-2">Ticket</th>
+                      <th className="px-3 py-2">Timestamp</th>
                       <th className="px-3 py-2">Customer</th>
                       <th className="px-3 py-2">Topic</th>
                       <th className="px-3 py-2">State</th>
@@ -694,13 +748,14 @@ const CustomerManagement = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {supportTickets.map((row) => (
+                    {sortedSupportTickets.map((row) => (
                         <tr key={row.id} className="border-t border-slate-800">
                           <td className="px-3 py-3 text-white">
                             {editingSupportId === row.id ? (
                               <input value={editSupport.ticketNo} onChange={(e) => setEditSupport((p) => ({ ...p, ticketNo: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
                             ) : row.ticketNo}
                           </td>
+                          <td className="px-3 py-3 text-slate-400">{formatTimestamp(row)}</td>
                           <td className="px-3 py-3 text-slate-300">
                             {editingSupportId === row.id ? (
                               <input value={editSupport.customerName} onChange={(e) => setEditSupport((p) => ({ ...p, customerName: e.target.value }))} className="w-full rounded-md border border-slate-700 bg-slate-950/70 px-2 py-1 outline-none focus:border-orange-500" />
