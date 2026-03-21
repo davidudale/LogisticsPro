@@ -1,4 +1,12 @@
-import { addDoc, collection, getFirestore, serverTimestamp } from "firebase/firestore";
+import {
+  addDoc,
+  arrayUnion,
+  collection,
+  doc,
+  getFirestore,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
 import { app } from "./firebase";
 
 const db = getFirestore(app);
@@ -36,4 +44,29 @@ export const createNotificationRecord = async ({
   });
 
   return addDoc(collection(db, "notifications"), payload);
+};
+
+export const hasNotificationBeenRead = (notification, userUid) => {
+  const normalizedUid = normalizeValue(userUid);
+  if (!normalizedUid) return false;
+
+  const readBy = Array.isArray(notification?.readBy) ? notification.readBy : [];
+  return readBy.some((value) => normalizeValue(value) === normalizedUid);
+};
+
+export const markNotificationsAsRead = async (notificationIds, userUid) => {
+  const normalizedUid = normalizeValue(userUid);
+  const idsToUpdate = [...new Set((notificationIds || []).filter(Boolean))];
+
+  if (!normalizedUid || !idsToUpdate.length) {
+    return;
+  }
+
+  await Promise.all(
+    idsToUpdate.map((notificationId) =>
+      updateDoc(doc(db, "notifications", notificationId), {
+        readBy: arrayUnion(normalizedUid),
+        updatedAt: serverTimestamp(),
+      })),
+  );
 };

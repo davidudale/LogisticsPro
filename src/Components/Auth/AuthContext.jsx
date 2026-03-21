@@ -65,7 +65,12 @@ export const AuthProvider = ({ children }) => {
           profile.role || tokenResult?.claims?.role,
         );
 
-        if (!currentUser.emailVerified && resolvedRole !== ROLE.ADMIN) {
+        if (
+          !currentUser.emailVerified
+          && resolvedRole !== ROLE.ADMIN
+          && resolvedRole !== ROLE.ACCOUNTS
+          && resolvedRole !== ROLE.DRIVER
+        ) {
           try {
             await signOut(auth);
           } catch (error) {
@@ -190,7 +195,12 @@ export const AuthProvider = ({ children }) => {
         const profile = profileSnap.exists() ? profileSnap.data() : {};
         const resolvedRole = normalizeRole(profile.role);
 
-        if (!credential.user.emailVerified && resolvedRole !== ROLE.ADMIN) {
+        if (
+          !credential.user.emailVerified
+          && resolvedRole !== ROLE.ADMIN
+          && resolvedRole !== ROLE.ACCOUNTS
+          && resolvedRole !== ROLE.DRIVER
+        ) {
           await signOut(auth);
           throw new Error("Verify your email before logging in.");
         }
@@ -216,7 +226,7 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={value}>
       {showTimeoutWarning && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
-          <div className="w-full max-w-md mx-4 rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-md mx-4 overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
             <h2 className="text-lg font-semibold text-white">
               Session expiring soon
             </h2>

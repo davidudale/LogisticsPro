@@ -35,6 +35,11 @@ import ShipmentOrdersSection from "./Components/Customers/ShipmentOrdersSection.
 import ShipmentQuotationsSection from "./Components/Customers/ShipmentQuotationsSection.jsx";
 import PendingQuotations from "./Components/AdminFiles/CustomerManagement/PendingQuotations.jsx";
 import QuotationHistory from "./Components/AdminFiles/QuotationHistory.jsx";
+import AccountsWorkspace from "./Components/Accounts/AccountsWorkspace.jsx";
+import AccountsDashboard from "./Components/Accounts/AccountsDashboard.jsx";
+import AccountsInvoices from "./Components/Accounts/AccountsInvoices.jsx";
+import AccountsPayments from "./Components/Accounts/AccountsPayments.jsx";
+import AccountsSettings from "./Components/Accounts/AccountsSettings.jsx";
 
 const App = () => {
   return (
@@ -59,7 +64,12 @@ const App = () => {
           <Route path="/opsmanager" element={<StaffDashboard />} />
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["accounts"]} />}>
-          <Route path="/accounts" element={<CustomersDashboard />} />
+          <Route path="/accounts" element={<AccountsWorkspace />}>
+            <Route index element={<AccountsDashboard />} />
+            <Route path="invoices" element={<AccountsInvoices />} />
+            <Route path="payments" element={<AccountsPayments />} />
+            <Route path="settings" element={<AccountsSettings />} />
+          </Route>
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["driver"]} />}>
           <Route path="/driver" element={<Drivers />} />

@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
-import { MessageSquare, Pencil, Plus, Printer, Search, Trash2, Truck, Users } from "lucide-react";
+import { Eye, MessageSquare, Pencil, Plus, Printer, Search, Trash2, Truck, Users } from "lucide-react";
 import { toast } from "react-toastify";
 import {
   addDoc,
@@ -16,6 +16,7 @@ import NavBar from "../../Basics/NavBar.jsx";
 import Sidebar from "../../Basics/Sidebar.jsx";
 import { app } from "../../Auth/firebase";
 import { createNotificationRecord } from "../../Auth/notificationUtils.js";
+import { computeRouteMetrics, isGoogleMapsConfigured } from "../../../services/googleMaps.js";
 import InvoicePreviewModal from "../../Shared/InvoicePreviewModal.jsx";
 
 const db = getFirestore(app);
@@ -26,11 +27,28 @@ const COLLECTIONS = {
   support: "order_issues",
   notifications: "notifications",
   fleetVehicles: "fleet_vehicles",
+  fleetDrivers: "fleet_drivers",
+  fleetRoutes: "fleet_routes",
 };
 
 const formatLocation = (location) => {
   if (!location || typeof location !== "object") return "Not available";
   return [location.address, location.lga, location.state, location.country].filter(Boolean).join(", ");
+};
+
+const formatEtaFromMinutes = (durationMinutes) => {
+  if (!durationMinutes || durationMinutes <= 0) {
+    return "";
+  }
+
+  const etaDate = new Date(Date.now() + durationMinutes * 60 * 1000);
+  return new Intl.DateTimeFormat("en-NG", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(etaDate);
 };
 
 const getTimestampValue = (value) => {
@@ -53,6 +71,22 @@ const formatTimestamp = (record) => {
   }).format(new Date(timestampValue));
 };
 
+const formatDateValue = (value) => {
+  if (!value) return "Not set";
+  const timestampValue = getTimestampValue(value);
+  if (!timestampValue) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-NG", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  }).format(new Date(timestampValue));
+};
+
+const normalizeIdentifier = (value) => value?.toString().trim().toUpperCase() || "";
+
 const mapCustomerRecord = (item) => {
   const data = item.data();
     return {
@@ -66,10 +100,14 @@ const mapCustomerRecord = (item) => {
       cargo: data.cargo || "",
       weight: data.weight || "",
       status: data.status || "Shipment Booking - In Progress",
-      origin: formatLocation(data.origin),
-      destination: formatLocation(data.destination),
+      origin: data.origin || {},
+      destination: data.destination || {},
       deliveryAddress: data.deliveryAddress || formatLocation(data.destination),
       eta: data.eta || "",
+      routeDistanceKm: data.routeDistanceKm || 0,
+      routeDurationMinutes: data.routeDurationMinutes || 0,
+      routePolyline: data.routePolyline || "",
+      routeSource: data.routeSource || "",
       itemQuantity: data.itemQuantity || 1,
       dimensions: data.dimensions || {},
       quoteTotal: data.quoteTotal || 0,
@@ -89,6 +127,34 @@ const mapOrderRecord = (item) => {
     eta: data.eta || "TBD",
     createdAt: data.createdAt || null,
     updatedAt: data.updatedAt || null,
+  };
+};
+
+const mapDriverRecord = (item) => {
+  const data = item.data();
+  return {
+    id: item.id,
+    fullName: data.fullName || "",
+    assignedTruckId: normalizeIdentifier(data.assignedTruckId),
+    assignmentStatus: data.assignmentStatus || "Available",
+    territory: data.territory || "",
+    certificationStatus: data.certificationStatus || "Compliant",
+  };
+};
+
+const mapRouteRecord = (item) => {
+  const data = item.data();
+  return {
+    id: item.id,
+    routeName: data.routeName || "",
+    route: data.route || "",
+    assignedDriver: data.assignedDriver || "",
+    assignedVehicle: normalizeIdentifier(data.assignedVehicle),
+    estimatedTime: data.estimatedTime || "",
+    distance: data.distance || "",
+    etaUpdate: data.etaUpdate || "",
+    gpsStatus: data.gpsStatus || "",
+    path: Array.isArray(data.path) ? data.path : [],
   };
 };
 
@@ -134,11 +200,14 @@ const OrderManagement = () => {
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
   const [isSupportModalOpen, setIsSupportModalOpen] = useState(false);
   const [isBookingPreviewOpen, setIsBookingPreviewOpen] = useState(false);
+  const [isVehicleDetailsOpen, setIsVehicleDetailsOpen] = useState(false);
 
   const [customers, setCustomers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [supportTickets, setSupportTickets] = useState([]);
   const [fleetVehicles, setFleetVehicles] = useState([]);
+  const [fleetDrivers, setFleetDrivers] = useState([]);
+  const [fleetRoutes, setFleetRoutes] = useState([]);
 
   const [loading, setLoading] = useState(true);
   const [busyRow, setBusyRow] = useState("");
@@ -157,6 +226,8 @@ const OrderManagement = () => {
   const [editSupport, setEditSupport] = useState(emptySupportForm);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [selectedTruckId, setSelectedTruckId] = useState("");
+  const [selectedDriverId, setSelectedDriverId] = useState("");
+  const [selectedRouteId, setSelectedRouteId] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [sendInvoiceChecked, setSendInvoiceChecked] = useState(false);
 
@@ -195,10 +266,75 @@ const OrderManagement = () => {
     [supportTickets],
   );
 
-  const selectedTruck = useMemo(
-    () => fleetVehicles.find((vehicle) => vehicle.id === selectedTruckId) || null,
-    [fleetVehicles, selectedTruckId],
+  const selectedDriver = useMemo(
+    () => fleetDrivers.find((driver) => driver.id === selectedDriverId) || null,
+    [fleetDrivers, selectedDriverId],
   );
+
+  const resolvedTruckId = selectedDriver?.assignedTruckId || selectedTruckId || "";
+
+  const selectedTruck = useMemo(
+    () => fleetVehicles.find((vehicle) => (
+      vehicle.id === resolvedTruckId
+      || vehicle.firestoreId === resolvedTruckId
+      || vehicle.licensePlate === resolvedTruckId
+      || (selectedDriver?.fullName && vehicle.driver?.trim().toLowerCase() === selectedDriver.fullName.trim().toLowerCase())
+    )) || null,
+    [fleetVehicles, resolvedTruckId, selectedDriver],
+  );
+
+  const selectedDriverRoutes = useMemo(
+    () => fleetRoutes.filter((route) => route.assignedDriver === selectedDriver?.fullName),
+    [fleetRoutes, selectedDriver],
+  );
+
+  const selectedRoute = useMemo(
+    () => selectedDriverRoutes.find((route) => route.id === selectedRouteId) || null,
+    [selectedDriverRoutes, selectedRouteId],
+  );
+
+  const selectedTruckMaintenanceSummary = useMemo(() => {
+    if (!selectedTruck) {
+      return { label: "Select a truck to review readiness", tone: "text-slate-400" };
+    }
+
+    if ((selectedTruck.status || "").toLowerCase() === "maintenance") {
+      return { label: "Vehicle is currently marked under maintenance.", tone: "text-rose-300" };
+    }
+
+    if (selectedTruck.maintenanceDue) {
+      const dueDate = new Date(selectedTruck.maintenanceDue);
+      if (!Number.isNaN(dueDate.getTime()) && dueDate <= new Date()) {
+        return { label: "Maintenance is due. Review before booking.", tone: "text-amber-300" };
+      }
+    }
+
+    return { label: "Maintenance status looks ready for dispatch.", tone: "text-emerald-300" };
+  }, [selectedTruck]);
+
+  const selectedTruckDetails = useMemo(() => {
+    if (!selectedTruck) {
+      return [];
+    }
+
+    return [
+      ["Vehicle ID", selectedTruck.id],
+      ["Vehicle Type", selectedTruck.type || "Not set"],
+      ["Make / Model", [selectedTruck.make, selectedTruck.model].filter(Boolean).join(" ") || "Not set"],
+      ["Assigned Driver", selectedTruck.driver || "No driver linked"],
+      ["Operational Status", selectedTruck.status || "Not set"],
+      ["Maintenance Due", formatDateValue(selectedTruck.maintenanceDue)],
+      ["Next Service Reminder", formatDateValue(selectedTruck.nextServiceReminder)],
+      ["Plate Number", selectedTruck.licensePlate || "Not set"],
+      ["Location", selectedTruck.location || "Not reporting"],
+      ["Capacity", selectedTruck.capacityTonnage ? `${selectedTruck.capacityTonnage} tons` : "Not set"],
+      ["Insurance", selectedTruck.insurance || "Not set"],
+      ["Inspection Certificate", selectedTruck.inspectionCertificate || "Not set"],
+      ["Permits", selectedTruck.permits || "Not set"],
+      ["Registration License", selectedTruck.registrationLicense || "Not set"],
+      ["Service History", selectedTruck.serviceHistory || "No maintenance note recorded yet.", "sm:col-span-2"],
+    ];
+  }, [selectedTruck]);
 
   const createAssignmentNotification = async ({
     title,
@@ -306,21 +442,49 @@ const OrderManagement = () => {
         const nextFleetVehicles = snapshot.docs.map((item) => {
           const data = item.data();
           return {
-            id: (data.id || "").trim().toUpperCase(),
+            firestoreId: normalizeIdentifier(item.id),
+            id: normalizeIdentifier(data.id),
             driver: data.driver || "",
             type: data.type || "",
             make: data.make || "",
             model: data.model || "",
-            licensePlate: data.licensePlate || "",
+            licensePlate: normalizeIdentifier(data.licensePlate),
             status: data.status || "",
             location: data.location || "",
             capacityTonnage: data.capacityTonnage || "",
+            maintenanceDue: data.maintenanceDue || "",
+            nextServiceReminder: data.nextServiceReminder || "",
+            serviceHistory: data.serviceHistory || "",
+            registrationLicense: data.registrationLicense || "",
+            insurance: data.insurance || "",
+            permits: data.permits || "",
+            inspectionCertificate: data.inspectionCertificate || "",
           };
-        }).filter((vehicle) => vehicle.id);
+        }).filter((vehicle) => vehicle.id || vehicle.firestoreId);
         setFleetVehicles(nextFleetVehicles);
       },
       (snapshotError) => {
         toast.error(snapshotError?.message || "Failed to watch fleet vehicles.");
+      },
+    );
+
+    const unsubscribeFleetDrivers = onSnapshot(
+      collection(db, COLLECTIONS.fleetDrivers),
+      (snapshot) => {
+        setFleetDrivers(snapshot.docs.map(mapDriverRecord).filter((driver) => driver.fullName));
+      },
+      (snapshotError) => {
+        toast.error(snapshotError?.message || "Failed to watch fleet drivers.");
+      },
+    );
+
+    const unsubscribeFleetRoutes = onSnapshot(
+      collection(db, COLLECTIONS.fleetRoutes),
+      (snapshot) => {
+        setFleetRoutes(snapshot.docs.map(mapRouteRecord).filter((route) => route.routeName));
+      },
+      (snapshotError) => {
+        toast.error(snapshotError?.message || "Failed to watch fleet routes.");
       },
     );
 
@@ -329,6 +493,8 @@ const OrderManagement = () => {
       unsubscribeOrders();
       unsubscribeSupport();
       unsubscribeFleetVehicles();
+      unsubscribeFleetDrivers();
+      unsubscribeFleetRoutes();
     };
   }, []);
 
@@ -425,43 +591,109 @@ const OrderManagement = () => {
   };
 
   const openBookingPreview = (customer) => {
+    const matchedDriver = fleetDrivers.find(
+      (driver) => driver.assignedTruckId && driver.assignedTruckId === (customer.truckId || "").trim().toUpperCase(),
+    );
+    const matchedDriverRoutes = matchedDriver
+      ? fleetRoutes.filter((route) => route.assignedDriver === matchedDriver.fullName)
+      : [];
+
     setSelectedBooking(customer);
     setSelectedTruckId((customer.truckId || "").trim().toUpperCase());
+    setSelectedDriverId(matchedDriver?.id || "");
+    setSelectedRouteId(matchedDriverRoutes[0]?.id || "");
     setIsBookingPreviewOpen(true);
   };
 
   const closeBookingPreview = () => {
     setIsBookingPreviewOpen(false);
+    setIsVehicleDetailsOpen(false);
     setSelectedBooking(null);
     setSelectedTruckId("");
+    setSelectedDriverId("");
+    setSelectedRouteId("");
     setSendInvoiceChecked(false);
   };
 
+  useEffect(() => {
+    if (!selectedDriver) {
+      setSelectedTruckId("");
+      setSelectedRouteId("");
+      return;
+    }
+
+    setSelectedTruckId(selectedDriver.assignedTruckId || "");
+    setSelectedRouteId((currentRouteId) => {
+      if (selectedDriverRoutes.some((route) => route.id === currentRouteId)) {
+        return currentRouteId;
+      }
+      return selectedDriverRoutes[0]?.id || "";
+    });
+  }, [selectedDriver, selectedDriverRoutes]);
+
   const bookShipment = async () => {
     if (!selectedBooking?.id) return;
-    if (!selectedTruckId) {
-      toast.error("No truck is attached to this order yet.");
+    const bookingTruckId = selectedDriver?.assignedTruckId || selectedTruckId || "";
+    if (!selectedDriver) {
+      toast.error("Select a driver before booking this shipment.");
+      return;
+    }
+    if (!bookingTruckId) {
+      toast.error("The selected driver does not have an attached truck yet.");
+      return;
+    }
+    if (!selectedRoute) {
+      toast.error("Select one of the routes attached to this driver before booking.");
       return;
     }
     setBusyRow(`book-${selectedBooking.id}`);
     try {
+      let routeMetrics = null;
+      if (
+        isGoogleMapsConfigured()
+        && selectedBooking.origin?.coordinates
+        && selectedBooking.destination?.coordinates
+      ) {
+        try {
+          routeMetrics = await computeRouteMetrics({
+            originCoordinates: selectedBooking.origin.coordinates,
+            destinationCoordinates: selectedBooking.destination.coordinates,
+          });
+        } catch (routeError) {
+          toast.info(routeError?.message || "Route metrics could not be synced, so booking will continue without Google ETA.");
+        }
+      }
+
+      const nextEta = routeMetrics?.durationMinutes
+        ? formatEtaFromMinutes(routeMetrics.durationMinutes)
+        : selectedBooking.eta || "";
+
       await updateDoc(doc(db, COLLECTIONS.customers, selectedBooking.id), {
-        truckId: selectedTruckId,
-        status: sendInvoiceChecked ? "Invoice sent" : "Truck Assigned",
+        assignedDriverId: selectedDriver.id,
+        assignedDriverName: selectedDriver.fullName,
+        assignedRouteId: selectedRoute.id,
+        assignedRouteName: selectedRoute.routeName,
+        truckId: bookingTruckId,
+        status: sendInvoiceChecked ? "Shipment Booked" : "Truck Assigned",
+        eta: nextEta,
+        routeDistanceKm: routeMetrics?.distanceKm || selectedBooking.routeDistanceKm || 0,
+        routeDurationMinutes: routeMetrics?.durationMinutes || selectedBooking.routeDurationMinutes || 0,
+        routePolyline: routeMetrics?.polyline || selectedBooking.routePolyline || "",
+        routeSource: routeMetrics?.source || selectedBooking.routeSource || "",
         updatedAt: serverTimestamp(),
       });
       await createAssignmentNotification({
         title: "Truck Assignment",
-        message: `Order ${selectedBooking.orderNo} has been assigned to truck ${selectedTruckId.toUpperCase()}.`,
+        message: `Order ${selectedBooking.orderNo} has been assigned to ${selectedDriver.fullName} on route ${selectedRoute.routeName} with truck ${bookingTruckId.toUpperCase()}.`,
         orderNo: selectedBooking.orderNo,
-        truckId: selectedTruckId,
+        truckId: bookingTruckId,
         type: "assignment_created",
       });
       await createOpsUserNotification({
         title: sendInvoiceChecked ? "Shipment Booked And Invoice Sent" : "Shipment Booked",
         message: sendInvoiceChecked
-          ? `Order ${selectedBooking.orderNo} has been booked and your invoice is now available.`
-          : `Order ${selectedBooking.orderNo} has been booked and assigned to truck ${selectedTruckId.toUpperCase()}.`,
+          ? `Order ${selectedBooking.orderNo} has been booked and your invoice is now available${nextEta ? ` with ETA ${nextEta}` : ""}.`
+          : `Order ${selectedBooking.orderNo} has been booked with driver ${selectedDriver.fullName} on route ${selectedRoute.routeName}${nextEta ? ` with ETA ${nextEta}` : ""}.`,
         customerUid: selectedBooking.customerUid || "",
         customerEmail: selectedBooking.customerEmail || "",
         orderNo: selectedBooking.orderNo,
@@ -686,15 +918,15 @@ const OrderManagement = () => {
                           <td className="px-3 py-3 text-slate-300">{row.customerName}</td>
                           <td className="px-3 py-3 text-slate-300">{row.cargo || "Not specified"}</td>
                           <td className="px-3 py-3 text-slate-400">{row.weight || "Not specified"}</td>
-                          <td className="px-3 py-3 text-slate-400">{row.origin}</td>
-                          <td className="px-3 py-3 text-slate-400">{row.destination}</td>
+                          <td className="px-3 py-3 text-slate-400">{formatLocation(row.origin)}</td>
+                          <td className="px-3 py-3 text-slate-400">{formatLocation(row.destination)}</td>
                           <td className="px-3 py-3 text-slate-300">{row.status}</td>
                            <td className="px-3 py-3">
                              <div className="flex items-center gap-2 flex-wrap">
                                <button type="button" onClick={() => openBookingPreview(row)} disabled={busyRow === row.id} className="inline-flex items-center gap-1 rounded-md border border-orange-500/40 px-2 py-1 text-xs text-orange-300 hover:bg-orange-500/10">
                                   <Trash2 size={12} /> Book Shipment
                                 </button>
-                                {row.status === "Invoice sent" ? (
+                                {row.status === "Shipment Booked" ? (
                                   <button type="button" onClick={() => setSelectedInvoice(row)} className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-100 hover:bg-slate-800">
                                     <Printer size={12} /> Print
                                   </button>
@@ -894,7 +1126,7 @@ const OrderManagement = () => {
 
             {isOrderModalOpen ? (
               <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
-                <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
+                <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-white">Add Tracking Update</h3>
                     <button type="button" onClick={() => setIsOrderModalOpen(false)} className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800">Close</button>
@@ -920,7 +1152,7 @@ const OrderManagement = () => {
 
             {isSupportModalOpen ? (
               <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
-                <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
+                <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-white">Add Delivery Confirmation</h3>
                     <button type="button" onClick={() => setIsSupportModalOpen(false)} className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800">Close</button>
@@ -946,7 +1178,7 @@ const OrderManagement = () => {
 
             {isBookingPreviewOpen && selectedBooking ? (
               <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
-                <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
+                <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-semibold text-white">Order Preview</h3>
@@ -961,11 +1193,10 @@ const OrderManagement = () => {
                       ["Customer", selectedBooking.customerName],
                       ["Cargo", selectedBooking.cargo || "Not specified"],
                       ["Weight", selectedBooking.weight || "Not specified"],
-                      ["Origin", selectedBooking.origin],
-                      ["Destination", selectedBooking.destination],
+                      ["Origin", formatLocation(selectedBooking.origin)],
+                      ["Destination", formatLocation(selectedBooking.destination)],
                       ["Delivery Address", selectedBooking.deliveryAddress || "Not available"],
                       ["Status", selectedBooking.status],
-                      ["Assigned Driver", selectedTruck?.driver || "Select a truck to view driver"],
                     ].map(([label, value]) => (
                       <div key={label} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
                         <p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p>
@@ -975,11 +1206,47 @@ const OrderManagement = () => {
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Truck ID</p>
-                      <select value={selectedTruckId} onChange={(event) => setSelectedTruckId(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-orange-500">
-                        <option value="">Select truck ID</option>
-                        {fleetVehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.id}</option>)}
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Assigned Driver</p>
+                      <select value={selectedDriverId} onChange={(event) => setSelectedDriverId(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-orange-500">
+                        <option value="">Select driver</option>
+                        {fleetDrivers.map((driver) => (
+                          <option key={driver.id} value={driver.id}>
+                            {driver.fullName}
+                          </option>
+                        ))}
                       </select>
+                      {selectedDriver ? (
+                        <div className="mt-3 space-y-1 text-xs text-slate-400">
+                          <p>Status: <span className="font-semibold text-slate-200">{selectedDriver.assignmentStatus}</span></p>
+                          <p>Territory: <span className="font-semibold text-slate-200">{selectedDriver.territory || "Not set"}</span></p>
+                          <p>Attached Truck: <span className="font-semibold text-slate-200">{selectedDriver.assignedTruckId || "Not attached"}</span></p>
+                        </div>
+                      ) : null}
+                    </div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Routes Attached To Driver</p>
+                      <select
+                        value={selectedRouteId}
+                        onChange={(event) => setSelectedRouteId(event.target.value)}
+                        disabled={!selectedDriverRoutes.length}
+                        className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-orange-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <option value="">
+                          {selectedDriver ? (selectedDriverRoutes.length ? "Select route" : "No route attached") : "Select driver first"}
+                        </option>
+                        {selectedDriverRoutes.map((route) => (
+                          <option key={route.id} value={route.id}>
+                            {route.routeName}
+                          </option>
+                        ))}
+                      </select>
+                      {selectedRoute ? (
+                        <div className="mt-3 space-y-1 text-xs text-slate-400">
+                          <p>Path: <span className="font-semibold text-slate-200">{selectedRoute.route || selectedRoute.path.join(" -> ") || "Not set"}</span></p>
+                          <p>Distance: <span className="font-semibold text-slate-200">{selectedRoute.distance || "Not set"}</span></p>
+                          <p>ETA Plan: <span className="font-semibold text-slate-200">{selectedRoute.estimatedTime || "Not set"}</span></p>
+                        </div>
+                      ) : null}
                     </div>
                     <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
                       <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Selected Vehicle</p>
@@ -994,6 +1261,15 @@ const OrderManagement = () => {
                           <p>Status: <span className="font-semibold text-white">{selectedTruck.status || "Not set"}</span></p>
                           <p>Location: <span className="font-semibold text-white">{selectedTruck.location || "Not reporting"}</span></p>
                           <p>Capacity: <span className="font-semibold text-white">{selectedTruck.capacityTonnage ? `${selectedTruck.capacityTonnage} tons` : "Not set"}</span></p>
+                          <p className={selectedTruckMaintenanceSummary.tone}>{selectedTruckMaintenanceSummary.label}</p>
+                          <button
+                            type="button"
+                            onClick={() => setIsVehicleDetailsOpen(true)}
+                            className="inline-flex items-center gap-2 rounded-lg border border-orange-500/30 bg-orange-500/10 px-3 py-2 text-xs font-semibold text-orange-200 transition hover:border-orange-400 hover:bg-orange-500/20"
+                          >
+                            <Eye size={14} />
+                            View more vehicle details
+                          </button>
                         </div>
                       ) : (
                         <p className="mt-2 text-sm font-semibold text-white">No vehicle selected</p>
@@ -1010,12 +1286,47 @@ const OrderManagement = () => {
                     />
                     <span>Send invoice to client together with the shipment order</span>
                   </label>
-                  {!selectedTruckId ? <p className="mt-4 text-sm text-amber-300">Select a truck ID to enable shipment booking and preview the assigned driver.</p> : null}
+                  {!selectedDriver ? <p className="mt-4 text-sm text-amber-300">Select a driver to load the attached route and vehicle before booking.</p> : null}
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                    <button type="button" onClick={bookShipment} disabled={!selectedTruckId || busyRow === `book-${selectedBooking.id}`} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
+                    <button type="button" onClick={bookShipment} disabled={!selectedDriver || !selectedRoute || !resolvedTruckId || busyRow === `book-${selectedBooking.id}`} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
                       {busyRow === `book-${selectedBooking.id}` ? "Booking..." : "Book Shipment"}
                     </button>
                   </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+            {isVehicleDetailsOpen && selectedTruck ? (
+              <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4">
+                <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-semibold text-white">Vehicle Readiness Details</h3>
+                      <p className="mt-1 text-sm text-slate-400">
+                        Review maintenance and compliance details before confirming shipment booking.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsVehicleDetailsOpen(false)}
+                      className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800"
+                    >
+                      Close
+                    </button>
+                  </div>
+                  <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/50 p-4">
+                    <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Dispatch Readiness</p>
+                    <p className={`mt-2 text-sm font-semibold ${selectedTruckMaintenanceSummary.tone}`}>
+                      {selectedTruckMaintenanceSummary.label}
+                    </p>
+                  </div>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {selectedTruckDetails.map(([label, value, span = ""]) => (
+                      <div key={label} className={`rounded-xl border border-slate-800 bg-slate-950/60 p-4 ${span}`}>
+                        <p className="text-xs uppercase tracking-[0.12em] text-slate-500">{label}</p>
+                        <p className="mt-2 text-sm font-semibold text-white">{value}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>

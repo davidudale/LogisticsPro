@@ -798,7 +798,7 @@ const CustomerManagement = () => {
 
             {isCustomerModalOpen ? (
               <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
-                <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
+                <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-white">Add Customer</h3>
                     <button type="button" onClick={() => setIsCustomerModalOpen(false)} className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800">Close</button>
@@ -832,7 +832,7 @@ const CustomerManagement = () => {
 
             {isOrderModalOpen ? (
               <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
-                <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
+                <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-white">Add Order</h3>
                     <button type="button" onClick={() => setIsOrderModalOpen(false)} className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800">Close</button>
@@ -858,7 +858,7 @@ const CustomerManagement = () => {
 
             {isSupportModalOpen ? (
               <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/60 p-4">
-                <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
+                <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-700 bg-slate-900 p-5 sm:p-6">
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-white">Add Support Ticket</h3>
                     <button type="button" onClick={() => setIsSupportModalOpen(false)} className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800">Close</button>

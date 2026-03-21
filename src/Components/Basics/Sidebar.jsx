@@ -119,7 +119,6 @@ const roleLinks = {
       icon: Settings,
       children: [
         { label: "Users Management", to: "/admin/users", icon: Users },
-        { label: "Drivers Management", to: "/admin/driver", icon: Users },
         { label: "Warehouse", to: "/admin/warehouse", icon: Warehouse },
         { label: "Settings", to: "/admin/settings", icon: Settings },
       ],

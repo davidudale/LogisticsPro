@@ -17,6 +17,7 @@ import { app } from "../../Auth/firebase";
 import { createNotificationRecord } from "../../Auth/notificationUtils.js";
 import NavBar from "../../Basics/NavBar.jsx";
 import Sidebar from "../../Basics/Sidebar.jsx";
+import { computeRouteMetrics, isGoogleMapsConfigured } from "../../../services/googleMaps.js";
 
 const db = getFirestore(app);
 const resumableQuotationStatuses = new Set([
@@ -250,8 +251,8 @@ const PendingQuotations = () => {
   const [quoteDraft, setQuoteDraft] = useState(null);
   const [breakdownPreview, setBreakdownPreview] = useState(null);
   const [quotationPreview, setQuotationPreview] = useState(null);
-  const [sendQuotationChecked, setSendQuotationChecked] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [routeSyncMessage, setRouteSyncMessage] = useState("");
 
   const loadQuotations = useCallback(async () => {
     setLoading(true);
@@ -453,13 +454,55 @@ const PendingQuotations = () => {
         }
       }
 
-      setSelectedQuotation(resolvedQuotation);
-      setQuoteDraft(
-        resolvedQuotation.pricingInputs
-          ? { ...buildQuoteDraft(resolvedQuotation), ...resolvedQuotation.pricingInputs }
-          : buildQuoteDraft(resolvedQuotation),
+      let nextDraft = resolvedQuotation.pricingInputs
+        ? { ...buildQuoteDraft(resolvedQuotation), ...resolvedQuotation.pricingInputs }
+        : buildQuoteDraft(resolvedQuotation);
+
+      setRouteSyncMessage(
+        isGoogleMapsConfigured()
+          ? "Fetching route distance from Google Routes..."
+          : "Google Routes is not configured, so pricing is using the internal distance estimate.",
       );
-      setSendQuotationChecked(false);
+
+      if (
+        isGoogleMapsConfigured()
+        && resolvedQuotation.origin?.coordinates
+        && resolvedQuotation.destination?.coordinates
+      ) {
+        try {
+          const routeMetrics = await computeRouteMetrics({
+            originCoordinates: resolvedQuotation.origin.coordinates,
+            destinationCoordinates: resolvedQuotation.destination.coordinates,
+          });
+
+          if (routeMetrics) {
+            nextDraft = {
+              ...nextDraft,
+              distanceKm: resolvedQuotation.pricingInputs?.distanceKm || routeMetrics.distanceKm,
+              tollFees: resolvedQuotation.pricingInputs?.tollFees || roundCurrency(routeMetrics.distanceKm * 12),
+              routeType:
+                resolvedQuotation.pricingInputs?.routeType
+                || (routeMetrics.distanceKm > 350 ? "rural" : "urban"),
+              routeDistanceKm: routeMetrics.distanceKm,
+              routeDurationMinutes: routeMetrics.durationMinutes,
+              routePolyline: routeMetrics.polyline,
+              routeSource: routeMetrics.source,
+            };
+            setRouteSyncMessage(
+              `Google Routes loaded ${routeMetrics.distanceKm} km with an estimated drive time of ${routeMetrics.durationMinutes} minutes.`,
+            );
+          } else {
+            setRouteSyncMessage("Google Routes returned no route, so pricing is using the internal distance estimate.");
+          }
+        } catch (routeError) {
+          setRouteSyncMessage(
+            routeError?.message || "Google Routes could not be reached, so pricing is using the internal distance estimate.",
+          );
+        }
+      }
+
+      setSelectedQuotation(resolvedQuotation);
+      setQuoteDraft(nextDraft);
       setQuoteModalOpen(true);
     } catch (error) {
       toast.error(error?.message || "Failed to open quotation details.");
@@ -475,7 +518,7 @@ const PendingQuotations = () => {
     setQuoteModalOpen(false);
     setSelectedQuotation(null);
     setQuoteDraft(null);
-    setSendQuotationChecked(false);
+    setRouteSyncMessage("");
   };
 
   const openBreakdownPreview = (quotation) => {
@@ -999,6 +1042,26 @@ const PendingQuotations = () => {
 
             <div className="mt-6 grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
               <div className="grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Route data</p>
+                  <p className="mt-2 text-sm text-slate-300">{routeSyncMessage || "Route metrics are being prepared."}</p>
+                  {quoteDraft.routeDistanceKm || quoteDraft.routeDurationMinutes ? (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-3">
+                        <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Drivable distance</p>
+                        <p className="mt-1 text-sm font-semibold text-white">
+                          {quoteDraft.routeDistanceKm || quoteDraft.distanceKm} km
+                        </p>
+                      </div>
+                      <div className="rounded-lg border border-slate-800 bg-slate-900/70 p-3">
+                        <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Estimated drive time</p>
+                        <p className="mt-1 text-sm font-semibold text-white">
+                          {quoteDraft.routeDurationMinutes ? `${quoteDraft.routeDurationMinutes} mins` : "Not available"}
+                        </p>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
                 <label className="space-y-2">
                   <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Distance (km)</span>
                   <input value={quoteDraft.distanceKm} onChange={(e) => setQuoteDraft((prev) => ({ ...prev, distanceKm: e.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none focus:border-orange-500" />
@@ -1133,30 +1196,18 @@ const PendingQuotations = () => {
                   >
                     {busyRow === "save-quotation-draft" ? "Saving..." : "Save Quotation Draft"}
                   </button>
-                  <label className="flex items-center gap-3 rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm font-semibold text-white">
-                    <input
-                      type="checkbox"
-                      checked={sendQuotationChecked}
-                      onChange={async (event) => {
-                        const isChecked = event.target.checked;
-                        setSendQuotationChecked(isChecked);
-                        if (!isChecked) {
-                          return;
-                        }
-                        await confirmQuotation();
-                        setSendQuotationChecked(false);
-                      }}
-                      disabled={busyRow === "confirm-quotation" || busyRow === "save-quotation-draft"}
-                      className="h-4 w-4 rounded border-orange-400 bg-slate-950 text-orange-500 focus:ring-orange-500"
-                    />
-                    <span>
-                      {busyRow === "confirm-quotation"
-                        ? "Sending..."
-                        : selectedQuotation.status === "Quotation Sent and Pending Client Review"
-                          ? "Send quotation"
-                          : "Confirm and Send quotation"}
-                    </span>
-                  </label>
+                  <button
+                    type="button"
+                    onClick={confirmQuotation}
+                    disabled={busyRow === "confirm-quotation" || busyRow === "save-quotation-draft"}
+                    className="w-full rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm font-semibold text-white transition hover:border-orange-400 hover:bg-orange-500/20 disabled:opacity-70"
+                  >
+                    {busyRow === "confirm-quotation"
+                      ? "Sending..."
+                      : selectedQuotation.status === "Quotation Sent and Pending Client Review"
+                        ? "Send quotation"
+                        : "Confirm and Send quotation"}
+                  </button>
                 </div>
               </div>
             </div>
@@ -1238,7 +1289,7 @@ const PendingQuotations = () => {
       ) : null}
       {deleteTarget ? (
         <div className="fixed inset-0 z-[145] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
             <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Delete quotation</p>
             <h3 className="mt-3 text-xl font-bold uppercase tracking-[0.08em] text-white">
               {deleteTarget.quotationNo || "Quotation record"}

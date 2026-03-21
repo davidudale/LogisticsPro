@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { addDoc, collection, doc, getFirestore, serverTimestamp, updateDoc } from "firebase/firestore";
 import { Activity, ClipboardList, Crosshair, LoaderCircle, MapPin, Package, Plus } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -10,9 +10,47 @@ import NavBar from "../Basics/NavBar.jsx";
 import Sidebar from "../Basics/Sidebar.jsx";
 import { nigeriaLocations, nigeriaStates } from "../../data/nigeriaLocations.js";
 import { useGeolocation } from "../../hooks/useGeolocation.js";
+import { isGoogleMapsConfigured, loadGoogleMaps } from "../../services/googleMaps.js";
 
 const db = getFirestore(app);
 const createQuotationNumber = () => `QT-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`;
+const addressComponentLookup = {
+  state: ["administrative_area_level_1"],
+  lga: ["administrative_area_level_2", "locality", "sublocality_level_1"],
+};
+
+const resolveAddressComponent = (components = [], candidateTypes = []) => {
+  const matchedComponent = components.find((component) =>
+    candidateTypes.some((candidateType) => component.types?.includes(candidateType)),
+  );
+  return matchedComponent?.long_name || "";
+};
+
+const extractAddressDetails = (geocodeResult) => {
+  const components = geocodeResult?.address_components || [];
+  const state = resolveAddressComponent(components, addressComponentLookup.state);
+  const lga = resolveAddressComponent(components, addressComponentLookup.lga);
+  const location = geocodeResult?.geometry?.location;
+
+  return {
+    state,
+    lga,
+    formattedAddress: geocodeResult?.formatted_address || "",
+    coordinates: location
+      ? {
+          latitude: location.lat(),
+          longitude: location.lng(),
+          capturedAt: Date.now(),
+        }
+      : null,
+  };
+};
+
+const initialAddressSuggestions = {
+  origin: [],
+  destination: [],
+};
+
 const initialOrderForm = {
   id: "",
   quotationNo: "",
@@ -39,16 +77,32 @@ const CustomersDashboard = () => {
   const [submissionMode, setSubmissionMode] = useState("");
   const [activeGeoTarget, setActiveGeoTarget] = useState("");
   const [orderForm, setOrderForm] = useState(initialOrderForm);
+  const [mapsReady, setMapsReady] = useState(false);
+  const [mapsError, setMapsError] = useState("");
+  const [addressSuggestions, setAddressSuggestions] = useState(initialAddressSuggestions);
+  const [routePreview, setRoutePreview] = useState(null);
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const autocompleteServiceRef = useRef(null);
+  const geocoderRef = useRef(null);
+  const suggestionHideTimeoutRef = useRef(null);
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const directionsServiceRef = useRef(null);
+  const directionsRendererRef = useRef(null);
+  const originMarkerRef = useRef(null);
+  const destinationMarkerRef = useRef(null);
   const {
     currentPosition,
     error: geolocationError,
     getCurrentPosition,
     isFetching: isFetchingLocation,
     isSupported: isGeolocationSupported,
+    isWatching: isWatchingLocation,
     permissionState,
+    startWatching,
+    stopWatching,
     resetError: resetGeolocationError,
   } = useGeolocation();
   const stats = [
@@ -58,12 +112,171 @@ const CustomersDashboard = () => {
     { label: "Satisfaction", value: "4.9/5", icon: Activity },
   ];
 
+  useEffect(() => {
+    if (!isGoogleMapsConfigured()) {
+      setMapsError("Set VITE_GOOGLE_MAPS_API_KEY to enable Google address suggestions.");
+      return;
+    }
+
+    let isActive = true;
+
+    loadGoogleMaps()
+      .then((maps) => {
+        if (!isActive) return;
+        autocompleteServiceRef.current = new maps.places.AutocompleteService();
+        geocoderRef.current = new maps.Geocoder();
+        directionsServiceRef.current = new maps.DirectionsService();
+        setMapsReady(true);
+        setMapsError("");
+      })
+      .catch((error) => {
+        if (!isActive) return;
+        setMapsError(error?.message || "Failed to load Google Maps services.");
+      });
+
+    return () => {
+      isActive = false;
+      if (suggestionHideTimeoutRef.current) {
+        clearTimeout(suggestionHideTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!mapsReady || !isCreateOrderOpen || !mapContainerRef.current || mapInstanceRef.current) {
+      return;
+    }
+
+    mapInstanceRef.current = new window.google.maps.Map(mapContainerRef.current, {
+      center: { lat: 9.082, lng: 8.6753 },
+      zoom: 6,
+      mapTypeControl: false,
+      streetViewControl: false,
+      fullscreenControl: false,
+      styles: [
+        { elementType: "geometry", stylers: [{ color: "#0f172a" }] },
+        { elementType: "labels.text.fill", stylers: [{ color: "#cbd5e1" }] },
+        { elementType: "labels.text.stroke", stylers: [{ color: "#0f172a" }] },
+        { featureType: "road", elementType: "geometry", stylers: [{ color: "#1e293b" }] },
+        { featureType: "water", elementType: "geometry", stylers: [{ color: "#172554" }] },
+      ],
+    });
+
+    directionsRendererRef.current = new window.google.maps.DirectionsRenderer({
+      map: mapInstanceRef.current,
+      suppressMarkers: true,
+      polylineOptions: {
+        strokeColor: "#f97316",
+        strokeOpacity: 0.95,
+        strokeWeight: 5,
+      },
+    });
+  }, [isCreateOrderOpen, mapsReady]);
+
+  useEffect(() => {
+    if (!mapsReady || !isCreateOrderOpen || !mapInstanceRef.current) {
+      return;
+    }
+
+    const map = mapInstanceRef.current;
+    const origin = orderForm.originCoordinates;
+    const destination = orderForm.destinationCoordinates;
+
+    if (originMarkerRef.current) {
+      originMarkerRef.current.setMap(null);
+      originMarkerRef.current = null;
+    }
+    if (destinationMarkerRef.current) {
+      destinationMarkerRef.current.setMap(null);
+      destinationMarkerRef.current = null;
+    }
+    if (directionsRendererRef.current) {
+      directionsRendererRef.current.setDirections({ routes: [] });
+    }
+    setRoutePreview(null);
+
+    const bounds = new window.google.maps.LatLngBounds();
+
+    if (origin?.latitude && origin?.longitude) {
+      const originPosition = { lat: origin.latitude, lng: origin.longitude };
+      originMarkerRef.current = new window.google.maps.Marker({
+        map,
+        position: originPosition,
+        title: "Pickup location",
+        label: "O",
+      });
+      bounds.extend(originPosition);
+    }
+
+    if (destination?.latitude && destination?.longitude) {
+      const destinationPosition = { lat: destination.latitude, lng: destination.longitude };
+      destinationMarkerRef.current = new window.google.maps.Marker({
+        map,
+        position: destinationPosition,
+        title: "Destination location",
+        label: "D",
+      });
+      bounds.extend(destinationPosition);
+    }
+
+    if (
+      origin?.latitude
+      && origin?.longitude
+      && destination?.latitude
+      && destination?.longitude
+      && directionsServiceRef.current
+      && directionsRendererRef.current
+    ) {
+      directionsServiceRef.current.route(
+        {
+          origin: { lat: origin.latitude, lng: origin.longitude },
+          destination: { lat: destination.latitude, lng: destination.longitude },
+          travelMode: window.google.maps.TravelMode.DRIVING,
+        },
+        (result, status) => {
+          if (status !== "OK" || !result?.routes?.length) {
+            if (!bounds.isEmpty()) {
+              map.fitBounds(bounds, 80);
+            }
+            return;
+          }
+
+          directionsRendererRef.current.setDirections(result);
+          const leg = result.routes[0]?.legs?.[0];
+          setRoutePreview({
+            distanceText: leg?.distance?.text || "Not available",
+            durationText: leg?.duration?.text || "Not available",
+            startAddress: leg?.start_address || orderForm.originAddress || "Origin",
+            endAddress: leg?.end_address || orderForm.destinationAddress || "Destination",
+          });
+        },
+      );
+      return;
+    }
+
+    if (!bounds.isEmpty()) {
+      map.fitBounds(bounds, 80);
+    } else {
+      map.setCenter({ lat: 9.082, lng: 8.6753 });
+      map.setZoom(6);
+    }
+  }, [
+    isCreateOrderOpen,
+    mapsReady,
+    orderForm.destinationAddress,
+    orderForm.destinationCoordinates,
+    orderForm.originAddress,
+    orderForm.originCoordinates,
+  ]);
+
   const openCreateQuotationModal = () => {
     setOrderForm((prev) => ({
       ...initialOrderForm,
       quotationNo: createQuotationNumber(),
       customerName: prev.customerName || user?.displayName || "",
     }));
+    setAddressSuggestions(initialAddressSuggestions);
+    setRoutePreview(null);
     setIsCreateOrderOpen(true);
   };
 
@@ -90,6 +303,8 @@ const CustomersDashboard = () => {
           originCoordinates: draftQuotation.origin?.coordinates || null,
           destinationCoordinates: draftQuotation.destination?.coordinates || null,
         });
+        setAddressSuggestions(initialAddressSuggestions);
+        setRoutePreview(null);
         setIsCreateOrderOpen(true);
       } else {
         openCreateQuotationModal();
@@ -98,6 +313,16 @@ const CustomersDashboard = () => {
     }
   }, [location.pathname, location.state, navigate, user?.displayName]);
 
+  useEffect(() => {
+    if (isCreateOrderOpen) {
+      return undefined;
+    }
+
+    stopWatching();
+    setActiveGeoTarget("");
+    return undefined;
+  }, [isCreateOrderOpen, stopWatching]);
+
   const handleOrderFieldChange = (name, value) => {
     setOrderForm((prev) => ({
       ...prev,
@@ -105,6 +330,111 @@ const CustomersDashboard = () => {
       ...(name === "originState" ? { originLga: "" } : {}),
       ...(name === "destinationState" ? { destinationLga: "" } : {}),
     }));
+  };
+
+  const fetchAddressSuggestions = (target, value) => {
+    if (!mapsReady || !autocompleteServiceRef.current || value.trim().length < 3) {
+      setAddressSuggestions((prev) => ({ ...prev, [target]: [] }));
+      return;
+    }
+
+    autocompleteServiceRef.current.getPlacePredictions(
+      {
+        input: value.trim(),
+        componentRestrictions: { country: "ng" },
+        types: ["geocode"],
+      },
+      (predictions, status) => {
+        if (
+          status !== window.google?.maps?.places?.PlacesServiceStatus?.OK
+          || !Array.isArray(predictions)
+        ) {
+          setAddressSuggestions((prev) => ({ ...prev, [target]: [] }));
+          return;
+        }
+
+        setAddressSuggestions((prev) => ({
+          ...prev,
+          [target]: predictions.slice(0, 5).map((prediction) => ({
+            description: prediction.description,
+            placeId: prediction.place_id,
+          })),
+        }));
+      },
+    );
+  };
+
+  const handleAddressInputChange = (target, value) => {
+    const fieldName = target === "origin" ? "originAddress" : "destinationAddress";
+    const coordinateField = target === "origin" ? "originCoordinates" : "destinationCoordinates";
+    handleOrderFieldChange(fieldName, value);
+    setOrderForm((prev) => ({
+      ...prev,
+      [coordinateField]: null,
+    }));
+    fetchAddressSuggestions(target, value);
+  };
+
+  const applyResolvedAddress = (target, resolvedAddress) => {
+    setOrderForm((prev) => ({
+      ...prev,
+      [target === "origin" ? "originState" : "destinationState"]: resolvedAddress.state || prev[target === "origin" ? "originState" : "destinationState"],
+      [target === "origin" ? "originLga" : "destinationLga"]: resolvedAddress.lga || prev[target === "origin" ? "originLga" : "destinationLga"],
+      [target === "origin" ? "originAddress" : "destinationAddress"]: resolvedAddress.formattedAddress || prev[target === "origin" ? "originAddress" : "destinationAddress"],
+      [target === "origin" ? "originCoordinates" : "destinationCoordinates"]: resolvedAddress.coordinates,
+    }));
+  };
+
+  const selectAddressSuggestion = (target, suggestion) => {
+    if (!geocoderRef.current) {
+      return;
+    }
+
+    geocoderRef.current.geocode({ placeId: suggestion.placeId }, (results, status) => {
+      if (status !== "OK" || !results?.length) {
+        toast.error("Unable to resolve the selected address.");
+        return;
+      }
+
+      applyResolvedAddress(target, extractAddressDetails(results[0]));
+      setAddressSuggestions((prev) => ({ ...prev, [target]: [] }));
+    });
+  };
+
+  const resolveTypedAddress = async (target) => {
+    const addressValue = target === "origin" ? orderForm.originAddress : orderForm.destinationAddress;
+    const stateValue = target === "origin" ? orderForm.originState : orderForm.destinationState;
+    const lgaValue = target === "origin" ? orderForm.originLga : orderForm.destinationLga;
+    const coordinateValue = target === "origin" ? orderForm.originCoordinates : orderForm.destinationCoordinates;
+
+    if (!mapsReady || !geocoderRef.current || !addressValue.trim() || coordinateValue) {
+      return;
+    }
+
+    const addressQuery = [addressValue.trim(), lgaValue.trim(), stateValue.trim(), "Nigeria"]
+      .filter(Boolean)
+      .join(", ");
+
+    await new Promise((resolve) => {
+      geocoderRef.current.geocode({ address: addressQuery }, (results, status) => {
+        if (status === "OK" && results?.length) {
+          applyResolvedAddress(target, extractAddressDetails(results[0]));
+        }
+        resolve();
+      });
+    });
+  };
+
+  const handleAddressBlur = (target) => {
+    suggestionHideTimeoutRef.current = setTimeout(() => {
+      setAddressSuggestions((prev) => ({ ...prev, [target]: [] }));
+    }, 120);
+  };
+
+  const cancelAddressBlur = () => {
+    if (suggestionHideTimeoutRef.current) {
+      clearTimeout(suggestionHideTimeoutRef.current);
+    }
   };
 
   const updateItemQuantity = (delta) => {
@@ -136,8 +466,67 @@ const CustomersDashboard = () => {
     return `${coordinates.latitude.toFixed(6)}, ${coordinates.longitude.toFixed(6)}`;
   };
 
+  const formatCapturedAt = (coordinates) => {
+    if (!coordinates?.capturedAt) {
+      return "";
+    }
+
+    return new Date(coordinates.capturedAt).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
+  const resolveCurrentLocationDetails = async (target, position) => {
+    const coordinates = {
+      latitude: position.latitude,
+      longitude: position.longitude,
+      accuracy: position.accuracy,
+      capturedAt: position.timestamp || Date.now(),
+    };
+
+    let resolvedAddress = {
+      formattedAddress: `Current location (${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)})`,
+      state: "",
+      lga: "",
+      coordinates,
+    };
+
+    if (mapsReady && geocoderRef.current) {
+      await new Promise((resolve) => {
+        geocoderRef.current.geocode(
+          {
+            location: {
+              lat: position.latitude,
+              lng: position.longitude,
+            },
+          },
+          (results, status) => {
+            if (status === "OK" && results?.length) {
+              resolvedAddress = {
+                ...extractAddressDetails(results[0]),
+                coordinates,
+              };
+            }
+            resolve();
+          },
+        );
+      });
+    }
+
+    applyResolvedAddress(target, resolvedAddress);
+  };
+
+  useEffect(() => {
+    if (!isCreateOrderOpen || !activeGeoTarget || !currentPosition) {
+      return;
+    }
+
+    resolveCurrentLocationDetails(activeGeoTarget, currentPosition);
+  }, [activeGeoTarget, currentPosition, isCreateOrderOpen, mapsReady]);
+
   const applyCurrentLocation = async (target) => {
-    setActiveGeoTarget(target);
     resetGeolocationError();
 
     const position = await getCurrentPosition();
@@ -148,25 +537,13 @@ const CustomersDashboard = () => {
       return;
     }
 
-    const coordinates = {
-      latitude: position.latitude,
-      longitude: position.longitude,
-      accuracy: position.accuracy,
-      capturedAt: position.timestamp || Date.now(),
-    };
-
-    setOrderForm((prev) => ({
-      ...prev,
-      [target === "origin" ? "originCoordinates" : "destinationCoordinates"]: coordinates,
-      [target === "origin" ? "originAddress" : "destinationAddress"]:
-        prev[target === "origin" ? "originAddress" : "destinationAddress"]
-        || `Current location (${position.latitude.toFixed(6)}, ${position.longitude.toFixed(6)})`,
-    }));
+    setActiveGeoTarget(target);
+    await resolveCurrentLocationDetails(target, position);
+    await startWatching({ enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
 
     toast.success(
-      `${target === "origin" ? "Pickup" : "Destination"} coordinates captured successfully.`,
+      `${target === "origin" ? "Pickup" : "Destination"} live location started.`,
     );
-    setActiveGeoTarget("");
   };
 
   const buildQuotationPayload = (resolvedQuotationNo, status) => ({
@@ -236,6 +613,10 @@ const CustomersDashboard = () => {
 
     setSubmissionMode(mode);
     try {
+      await Promise.all([
+        resolveTypedAddress("origin"),
+        resolveTypedAddress("destination"),
+      ]);
       const quotationNo = createQuotationNumber();
       const resolvedQuotationNo = orderForm.quotationNo.trim() || quotationNo;
       const payload = buildQuotationPayload(resolvedQuotationNo, mode === "draft" ? "SAVE" : "Quotation Pending");
@@ -267,6 +648,8 @@ const CustomersDashboard = () => {
           : `${orderForm.id ? "Quotation updated and submitted" : "Quotation request submitted"}: ${resolvedQuotationNo}`,
       );
       setOrderForm(initialOrderForm);
+      setAddressSuggestions(initialAddressSuggestions);
+      setRoutePreview(null);
       setIsCreateOrderOpen(false);
     } catch (error) {
       toast.error(
@@ -383,10 +766,10 @@ const CustomersDashboard = () => {
                   >
                     {isFetchingLocation && activeGeoTarget === "origin" ? (
                       <LoaderCircle size={14} className="animate-spin" />
-                    ) : (
-                      <Crosshair size={14} />
-                    )}
-                    Use current location
+                      ) : (
+                        <Crosshair size={14} />
+                      )}
+                    {activeGeoTarget === "origin" && isWatchingLocation ? "Live location active" : "Use current location"}
                   </button>
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -417,17 +800,41 @@ const CustomersDashboard = () => {
                       </option>
                     ))}
                   </select>
-                  <input
-                    value={orderForm.originAddress}
-                    onChange={(event) => handleOrderFieldChange("originAddress", event.target.value)}
-                    className="sm:col-span-2 rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500"
-                    placeholder="Origin address"
-                    required
-                  />
+                  <div className="sm:col-span-2 relative">
+                    <input
+                      value={orderForm.originAddress}
+                      onChange={(event) => handleAddressInputChange("origin", event.target.value)}
+                      onBlur={() => handleAddressBlur("origin")}
+                      onFocus={() => fetchAddressSuggestions("origin", orderForm.originAddress)}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500"
+                      placeholder="Origin address"
+                      required
+                    />
+                    {addressSuggestions.origin.length ? (
+                      <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-slate-700 bg-slate-950 shadow-2xl">
+                        {addressSuggestions.origin.map((suggestion) => (
+                          <button
+                            key={suggestion.placeId}
+                            type="button"
+                            onMouseDown={cancelAddressBlur}
+                            onClick={() => selectAddressSuggestion("origin", suggestion)}
+                            className="block w-full border-b border-slate-800 px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-800 last:border-b-0"
+                          >
+                            {suggestion.description}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs text-slate-400">
                   <p className="font-semibold uppercase tracking-[0.12em] text-slate-500">Captured pickup coordinates</p>
                   <p className="mt-1 text-slate-300">{formatCoordinates(orderForm.originCoordinates)}</p>
+                  {activeGeoTarget === "origin" && isWatchingLocation && formatCapturedAt(orderForm.originCoordinates) ? (
+                    <p className="mt-1 text-emerald-300">
+                      Live update: {formatCapturedAt(orderForm.originCoordinates)}
+                    </p>
+                  ) : null}
                 </div>
               </div>
               <div className="sm:col-span-2 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
@@ -446,10 +853,10 @@ const CustomersDashboard = () => {
                   >
                     {isFetchingLocation && activeGeoTarget === "destination" ? (
                       <LoaderCircle size={14} className="animate-spin" />
-                    ) : (
-                      <Crosshair size={14} />
-                    )}
-                    Use current location
+                      ) : (
+                        <Crosshair size={14} />
+                      )}
+                    {activeGeoTarget === "destination" && isWatchingLocation ? "Live location active" : "Use current location"}
                   </button>
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -480,19 +887,79 @@ const CustomersDashboard = () => {
                       </option>
                     ))}
                   </select>
-                  <input
-                    value={orderForm.destinationAddress}
-                    onChange={(event) => handleOrderFieldChange("destinationAddress", event.target.value)}
-                    className="sm:col-span-2 rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500"
-                    placeholder="Destination address"
-                    required
-                  />
+                  <div className="sm:col-span-2 relative">
+                    <input
+                      value={orderForm.destinationAddress}
+                      onChange={(event) => handleAddressInputChange("destination", event.target.value)}
+                      onBlur={() => handleAddressBlur("destination")}
+                      onFocus={() => fetchAddressSuggestions("destination", orderForm.destinationAddress)}
+                      className="w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm outline-none focus:border-orange-500"
+                      placeholder="Destination address"
+                      required
+                    />
+                    {addressSuggestions.destination.length ? (
+                      <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-slate-700 bg-slate-950 shadow-2xl">
+                        {addressSuggestions.destination.map((suggestion) => (
+                          <button
+                            key={suggestion.placeId}
+                            type="button"
+                            onMouseDown={cancelAddressBlur}
+                            onClick={() => selectAddressSuggestion("destination", suggestion)}
+                            className="block w-full border-b border-slate-800 px-3 py-2 text-left text-sm text-slate-200 hover:bg-slate-800 last:border-b-0"
+                          >
+                            {suggestion.description}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs text-slate-400">
                   <p className="font-semibold uppercase tracking-[0.12em] text-slate-500">Captured destination coordinates</p>
                   <p className="mt-1 text-slate-300">{formatCoordinates(orderForm.destinationCoordinates)}</p>
+                  {activeGeoTarget === "destination" && isWatchingLocation && formatCapturedAt(orderForm.destinationCoordinates) ? (
+                    <p className="mt-1 text-emerald-300">
+                      Live update: {formatCapturedAt(orderForm.destinationCoordinates)}
+                    </p>
+                  ) : null}
                 </div>
               </div>
+             {/* <div className="sm:col-span-2 rounded-xl border border-slate-800 bg-slate-950/40 p-4">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Route Map</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Preview your pickup and destination on Google Maps before submitting the quotation request.
+                    </p>
+                  </div>
+                  {routePreview ? (
+                    <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+                      <p>Distance: {routePreview.distanceText}</p>
+                      <p className="mt-1">Drive time: {routePreview.durationText}</p>
+                    </div>
+                  ) : null}
+                </div>
+                <div
+                  ref={mapContainerRef}
+                  className="mt-4 h-72 w-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-950"
+                />
+                {routePreview ? (
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
+                      <p className="font-semibold uppercase tracking-[0.12em] text-slate-500">Route Start</p>
+                      <p className="mt-1">{routePreview.startAddress}</p>
+                    </div>
+                    <div className="rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-xs text-slate-300">
+                      <p className="font-semibold uppercase tracking-[0.12em] text-slate-500">Route End</p>
+                      <p className="mt-1">{routePreview.endAddress}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-slate-500">
+                    Select both pickup and destination addresses to render the full route preview on the map.
+                  </p>
+                )}
+              </div>*/}
               <input
                 value={orderForm.cargo}
                 onChange={(event) => handleOrderFieldChange("cargo", event.target.value)}
@@ -589,6 +1056,15 @@ const CustomersDashboard = () => {
               ) : permissionState === "denied" ? (
                 <p className="sm:col-span-2 text-xs text-amber-300">
                   Location access is blocked in your browser. Enable it if you want pickup or destination coordinates attached to this quotation.
+                </p>
+              ) : null}
+              {mapsError ? (
+                <p className="sm:col-span-2 text-xs text-slate-400">
+                  {mapsError}
+                </p>
+              ) : mapsReady ? (
+                <p className="sm:col-span-2 text-xs text-emerald-300">
+                  Google address suggestions are active for origin and destination.
                 </p>
               ) : null}
             </form>

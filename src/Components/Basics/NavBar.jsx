@@ -4,6 +4,10 @@ import { Bell, LogOut, Menu, X } from "lucide-react";
 import { collection, getFirestore, onSnapshot, orderBy, query } from "firebase/firestore";
 import { app } from "../Auth/firebase.js";
 import { useAuth } from "../Auth/AuthContext.jsx";
+import {
+  hasNotificationBeenRead,
+  markNotificationsAsRead,
+} from "../Auth/notificationUtils.js";
 
 const db = getFirestore(app);
 
@@ -28,13 +32,50 @@ const formatNotificationTime = (value) => {
   }).format(new Date(timestampValue));
 };
 
+const buildNotificationDestination = (notification, role) => {
+  const normalizedRole = normalizeValue(role);
+  const normalizedType = normalizeValue(notification?.type);
+  const params = new URLSearchParams();
+
+  if (notification?.id) params.set("notification", notification.id);
+  if (notification?.quotationNo) params.set("quotationNo", notification.quotationNo);
+  if (notification?.orderNo) params.set("orderNo", notification.orderNo);
+
+  if (normalizedRole === "driver") {
+    return `/driver/assignments${params.toString() ? `?${params.toString()}` : ""}`;
+  }
+
+  if (normalizedRole === "admin") {
+    const adminPath = normalizedType.startsWith("quotation")
+      ? "/admin/pendingQuotation"
+      : "/admin/orders";
+    return `${adminPath}${params.toString() ? `?${params.toString()}` : ""}`;
+  }
+
+  if (normalizedRole === "opsuser") {
+    const customerPath = normalizedType.includes("quotation")
+      ? "/opsuser/shipments/quotations"
+      : "/opsuser/shipments/requests";
+    return `${customerPath}${params.toString() ? `?${params.toString()}` : ""}`;
+  }
+
+  if (normalizedRole === "accounts") {
+    const accountsPath = normalizedType.includes("payment")
+      ? "/accounts/payments"
+      : "/accounts/invoices";
+    return `${accountsPath}${params.toString() ? `?${params.toString()}` : ""}`;
+  }
+
+  const fallbackPath = normalizedRole ? `/${normalizedRole}` : "/";
+  return `${fallbackPath}${params.toString() ? `?${params.toString()}` : ""}`;
+};
+
 const NavBar = ({ title = "Dashboard", onToggleSidebar }) => {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState([]);
-  const [readNotificationIds, setReadNotificationIds] = useState([]);
   const notificationsPanelRef = useRef(null);
 
   const handleLogout = async () => {
@@ -55,7 +96,6 @@ const NavBar = ({ title = "Dashboard", onToggleSidebar }) => {
   useEffect(() => {
     if (!user?.uid) {
       setNotifications([]);
-      setReadNotificationIds([]);
       return undefined;
     }
 
@@ -110,21 +150,70 @@ const NavBar = ({ title = "Dashboard", onToggleSidebar }) => {
     return () => document.removeEventListener("mousedown", handlePointerDown);
   }, [notificationsOpen]);
 
-  const unreadCount = notifications.filter(
-    (notification) => !readNotificationIds.includes(notification.id),
-  ).length;
+  const unreadNotifications = notifications.filter(
+    (notification) => !hasNotificationBeenRead(notification, user?.uid),
+  );
+  const unreadCount = unreadNotifications.length;
 
   const toggleNotifications = () => {
-    setNotificationsOpen((prev) => {
-      const nextState = !prev;
-      if (!prev) {
-        setReadNotificationIds((current) => [
-          ...new Set([...current, ...notifications.map((notification) => notification.id)]),
-        ]);
-      }
-      return nextState;
-    });
+    setNotificationsOpen((prev) => !prev);
   };
+
+  const clearNotifications = async (notificationIds) => {
+    try {
+      await markNotificationsAsRead(notificationIds, user?.uid);
+    } catch (error) {
+      console.error("Failed to clear notifications:", error);
+    }
+  };
+
+  const handleNotificationClick = async (notification) => {
+    await clearNotifications([notification.id]);
+    setNotificationsOpen(false);
+    setIsMenuOpen(false);
+    navigate(buildNotificationDestination(notification, user?.role));
+  };
+
+  const handleClearAllNotifications = async () => {
+    await clearNotifications(unreadNotifications.map((notification) => notification.id));
+  };
+
+  const renderNotificationItem = (notification, compact = false) => (
+    <div
+      key={notification.id}
+      className={`border-b border-slate-800/80 ${compact ? "px-4 py-3" : "bg-orange-500/5 px-4 py-3"}`}
+    >
+      <button
+        type="button"
+        onClick={() => void handleNotificationClick(notification)}
+        className="w-full rounded-lg text-left transition hover:bg-slate-900/70 focus:outline-none focus:ring-2 focus:ring-orange-500/60"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <p className={`${compact ? "text-xs tracking-[0.12em]" : "text-sm tracking-[0.08em]"} font-semibold uppercase text-white`}>
+            {notification.title || "LogisticsPro Notification"}
+          </p>
+          <span className="whitespace-nowrap text-[10px] uppercase tracking-[0.14em] text-slate-500">
+            {formatNotificationTime(notification.createdAt || notification.updatedAt)}
+          </span>
+        </div>
+        <p className="mt-2 text-xs leading-5 text-slate-400">
+          {notification.message || "You have a new update."}
+        </p>
+        <p className="mt-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-orange-400">
+          Open notification
+        </p>
+      </button>
+      <div className="mt-3 flex justify-end">
+        <button
+          type="button"
+          onClick={() => void clearNotifications([notification.id])}
+          className="rounded-md border border-slate-700 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300 transition hover:border-orange-500/50 hover:text-white"
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <header className="sticky top-0 w-full border-b border-slate-800 bg-slate-900/50 backdrop-blur-md z-50">
@@ -171,36 +260,27 @@ const NavBar = ({ title = "Dashboard", onToggleSidebar }) => {
             {notificationsOpen ? (
               <div className="absolute right-0 top-14 z-[90] w-[22rem] overflow-hidden rounded-2xl border border-slate-800 bg-slate-950/95 shadow-2xl">
                 <div className="border-b border-slate-800 px-4 py-3">
-                  <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Notifications</p>
-                  <p className="mt-1 text-sm font-semibold text-white">
-                    {notifications.length ? "Latest updates" : "No notifications yet"}
-                  </p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Notifications</p>
+                      <p className="mt-1 text-sm font-semibold text-white">
+                        {unreadNotifications.length ? "Latest updates" : "No notifications yet"}
+                      </p>
+                    </div>
+                    {unreadNotifications.length ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleClearAllNotifications()}
+                        className="rounded-md border border-slate-700 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300 transition hover:border-orange-500/50 hover:text-white"
+                      >
+                        Clear all
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
                 <div className="max-h-[24rem] overflow-y-auto">
-                  {notifications.length ? (
-                    notifications.map((notification) => {
-                      const isUnread = !readNotificationIds.includes(notification.id);
-                      return (
-                        <div
-                          key={notification.id}
-                          className={`border-b border-slate-800/80 px-4 py-3 ${
-                            isUnread ? "bg-orange-500/5" : "bg-transparent"
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="text-sm font-semibold uppercase tracking-[0.08em] text-white">
-                              {notification.title || "LogisticsPro Notification"}
-                            </p>
-                            <span className="whitespace-nowrap text-[10px] uppercase tracking-[0.14em] text-slate-500">
-                              {formatNotificationTime(notification.createdAt || notification.updatedAt)}
-                            </span>
-                          </div>
-                          <p className="mt-2 text-xs leading-5 text-slate-400">
-                            {notification.message || "You have a new update."}
-                          </p>
-                        </div>
-                      );
-                    })
+                  {unreadNotifications.length ? (
+                    unreadNotifications.map((notification) => renderNotificationItem(notification))
                   ) : (
                     <div className="px-4 py-6 text-sm text-slate-400">
                       Notifications for your account, role, or assigned truck will show here.
@@ -248,22 +328,19 @@ const NavBar = ({ title = "Dashboard", onToggleSidebar }) => {
           </button>
           {notificationsOpen ? (
             <div className="max-h-[18rem] overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/60">
-              {notifications.length ? (
-                notifications.map((notification) => (
-                  <div key={notification.id} className="border-b border-slate-800/80 px-4 py-3 last:border-b-0">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-white">
-                        {notification.title || "LogisticsPro Notification"}
-                      </p>
-                      <span className="whitespace-nowrap text-[10px] uppercase tracking-[0.14em] text-slate-500">
-                        {formatNotificationTime(notification.createdAt || notification.updatedAt)}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs leading-5 text-slate-400">
-                      {notification.message || "You have a new update."}
-                    </p>
+              {unreadNotifications.length ? (
+                <>
+                  <div className="flex justify-end border-b border-slate-800/80 px-4 py-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleClearAllNotifications()}
+                      className="rounded-md border border-slate-700 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-300 transition hover:border-orange-500/50 hover:text-white"
+                    >
+                      Clear all
+                    </button>
                   </div>
-                ))
+                  {unreadNotifications.map((notification) => renderNotificationItem(notification, true))}
+                </>
               ) : (
                 <div className="px-4 py-5 text-sm text-slate-400">
                   Notifications for your account will appear here.

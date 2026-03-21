@@ -3,6 +3,7 @@ import { collection, getFirestore, onSnapshot, orderBy, query } from "firebase/f
 import { toast } from "react-toastify";
 import { app } from "./firebase";
 import { useAuth } from "./AuthContext.jsx";
+import { hasNotificationBeenRead } from "./notificationUtils.js";
 
 const db = getFirestore(app);
 
@@ -43,7 +44,11 @@ const NotificationListener = () => {
             || (targetTruckId && assignedTruckId && targetTruckId === assignedTruckId)
           );
 
-          if (!isForCurrentUser || shownNotificationsRef.current.has(notification.id)) {
+          if (
+            !isForCurrentUser
+            || hasNotificationBeenRead(notification, user.uid)
+            || shownNotificationsRef.current.has(notification.id)
+          ) {
             return;
           }
 

@@ -1253,7 +1253,7 @@ const QuotationHistory = () => {
       ) : null}
       {deleteTarget ? (
         <div className="fixed inset-0 z-[145] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
             <p className="text-xs uppercase tracking-[0.22em] text-slate-500">Delete quotation</p>
             <h3 className="mt-3 text-xl font-bold uppercase tracking-[0.08em] text-white">
               {deleteTarget.quotationNo || "Quotation record"}
