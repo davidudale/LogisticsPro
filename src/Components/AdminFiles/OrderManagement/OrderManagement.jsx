@@ -16,7 +16,7 @@ import NavBar from "../../Basics/NavBar.jsx";
 import Sidebar from "../../Basics/Sidebar.jsx";
 import { app } from "../../Auth/firebase";
 import { createNotificationRecord } from "../../Auth/notificationUtils.js";
-import { computeRouteMetrics, isGoogleMapsConfigured } from "../../../services/googleMaps.js";
+import { computeRouteMetrics, isGoogleMapsConfigured } from "../../../Services/googleMaps.js";
 import InvoicePreviewModal from "../../Shared/InvoicePreviewModal.jsx";
 
 const db = getFirestore(app);
