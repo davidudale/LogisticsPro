@@ -3,7 +3,7 @@ import { Box, CreditCard, Printer } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
 import { toast } from "react-toastify";
 import InvoicePreviewModal from "../Shared/InvoicePreviewModal.jsx";
-import { startPaystackOrderPayment } from "../../services/paystack.js";
+import { startPaystackOrderPayment } from "../../Services/paystack.js";
 
 const ShipmentOrdersSection = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
