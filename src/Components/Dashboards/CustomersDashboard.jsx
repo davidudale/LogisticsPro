@@ -10,7 +10,7 @@ import NavBar from "../Basics/NavBar.jsx";
 import Sidebar from "../Basics/Sidebar.jsx";
 import { nigeriaLocations, nigeriaStates } from "../../data/nigeriaLocations.js";
 import { useGeolocation } from "../../hooks/useGeolocation.js";
-import { isGoogleMapsConfigured, loadGoogleMaps } from "../../services/googleMaps.js";
+import { isGoogleMapsConfigured, loadGoogleMaps } from "../../Services/googleMaps.js";
 
 const db = getFirestore(app);
 const createQuotationNumber = () => `QT-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`;
