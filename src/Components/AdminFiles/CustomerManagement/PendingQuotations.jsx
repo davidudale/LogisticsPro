@@ -17,7 +17,7 @@ import { app } from "../../Auth/firebase";
 import { createNotificationRecord } from "../../Auth/notificationUtils.js";
 import NavBar from "../../Basics/NavBar.jsx";
 import Sidebar from "../../Basics/Sidebar.jsx";
-import { computeRouteMetrics, isGoogleMapsConfigured } from "../../../services/googleMaps.js";
+import { computeRouteMetrics, isGoogleMapsConfigured } from "../../../Services/googleMaps.js";
 
 const db = getFirestore(app);
 const resumableQuotationStatuses = new Set([
