@@ -1,5 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from "react";
-import { Eye, MessageSquare, Pencil, Plus, Printer, Search, Trash2, Truck, Users } from "lucide-react";
+import { CheckCircle2, Eye, MessageSquare, Pencil, Plus, Printer, Search, Trash2, Truck, Users } from "lucide-react";
 import { toast } from "react-toastify";
 import {
   addDoc,
@@ -15,6 +15,7 @@ import {
 import NavBar from "../../Basics/NavBar.jsx";
 import Sidebar from "../../Basics/Sidebar.jsx";
 import { app } from "../../Auth/firebase";
+import { useAuth } from "../../Auth/AuthContext.jsx";
 import { createNotificationRecord } from "../../Auth/notificationUtils.js";
 import { computeRouteMetrics, isGoogleMapsConfigured } from "../../../Services/googleMaps.js";
 import InvoicePreviewModal from "../../Shared/InvoicePreviewModal.jsx";
@@ -99,7 +100,7 @@ const mapCustomerRecord = (item) => {
       truckId: data.truckId || "",
       cargo: data.cargo || "",
       weight: data.weight || "",
-      status: data.status || "Shipment Booking - In Progress",
+      status: data.status || "6Shipment Booking - In Progress",
       origin: data.origin || {},
       destination: data.destination || {},
       deliveryAddress: data.deliveryAddress || formatLocation(data.destination),
@@ -193,6 +194,7 @@ const emptySupportForm = {
 };
 
 const OrderManagement = () => {
+  const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [activeTab, setActiveTab] = useState("customers");
@@ -230,6 +232,8 @@ const OrderManagement = () => {
   const [selectedRouteId, setSelectedRouteId] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [sendInvoiceChecked, setSendInvoiceChecked] = useState(false);
+
+  const canApproveTruckAssignment = ["admin", "opsmanager"].includes((user?.role || "").toLowerCase());
 
   const filteredCustomers = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -590,6 +594,31 @@ const OrderManagement = () => {
     }
   };
 
+  const approveTruckAssignment = async (customer) => {
+    if (!customer?.id) return;
+    setBusyRow(customer.id);
+    try {
+      await updateDoc(doc(db, COLLECTIONS.customers, customer.id), {
+        status: "Shipment- In Transit",
+        updatedAt: serverTimestamp(),
+      });
+      await createOpsUserNotification({
+        title: "Shipment In Transit",
+        message: `Order ${customer.orderNo} has been approved and is now marked as Shipment- In Transit.`,
+        customerUid: customer.customerUid || "",
+        customerEmail: customer.customerEmail || "",
+        orderNo: customer.orderNo,
+        quotationNo: customer.quotationNo || "",
+        type: "shipment_in_transit",
+      });
+      toast.success(`Truck assignment approved for order ${customer.orderNo}.`);
+    } catch (approvalError) {
+      toast.error(approvalError?.message || "Failed to approve truck assignment.");
+    } finally {
+      setBusyRow("");
+    }
+  };
+
   const openBookingPreview = (customer) => {
     const matchedDriver = fleetDrivers.find(
       (driver) => driver.assignedTruckId && driver.assignedTruckId === (customer.truckId || "").trim().toUpperCase(),
@@ -617,7 +646,6 @@ const OrderManagement = () => {
 
   useEffect(() => {
     if (!selectedDriver) {
-      setSelectedTruckId("");
       setSelectedRouteId("");
       return;
     }
@@ -634,16 +662,8 @@ const OrderManagement = () => {
   const bookShipment = async () => {
     if (!selectedBooking?.id) return;
     const bookingTruckId = selectedDriver?.assignedTruckId || selectedTruckId || "";
-    if (!selectedDriver) {
-      toast.error("Select a driver before booking this shipment.");
-      return;
-    }
     if (!bookingTruckId) {
-      toast.error("The selected driver does not have an attached truck yet.");
-      return;
-    }
-    if (!selectedRoute) {
-      toast.error("Select one of the routes attached to this driver before booking.");
+      toast.error("Select a truck before booking this shipment.");
       return;
     }
     setBusyRow(`book-${selectedBooking.id}`);
@@ -669,12 +689,12 @@ const OrderManagement = () => {
         : selectedBooking.eta || "";
 
       await updateDoc(doc(db, COLLECTIONS.customers, selectedBooking.id), {
-        assignedDriverId: selectedDriver.id,
-        assignedDriverName: selectedDriver.fullName,
-        assignedRouteId: selectedRoute.id,
-        assignedRouteName: selectedRoute.routeName,
+        assignedDriverId: selectedDriver?.id || "",
+        assignedDriverName: selectedDriver?.fullName || "",
+        assignedRouteId: selectedRoute?.id || "",
+        assignedRouteName: selectedRoute?.routeName || "",
         truckId: bookingTruckId,
-        status: sendInvoiceChecked ? "Shipment Booked" : "Truck Assigned",
+        status: "Shipment Booked",
         eta: nextEta,
         routeDistanceKm: routeMetrics?.distanceKm || selectedBooking.routeDistanceKm || 0,
         routeDurationMinutes: routeMetrics?.durationMinutes || selectedBooking.routeDurationMinutes || 0,
@@ -684,7 +704,7 @@ const OrderManagement = () => {
       });
       await createAssignmentNotification({
         title: "Truck Assignment",
-        message: `Order ${selectedBooking.orderNo} has been assigned to ${selectedDriver.fullName} on route ${selectedRoute.routeName} with truck ${bookingTruckId.toUpperCase()}.`,
+        message: `Order ${selectedBooking.orderNo} has been assigned${selectedDriver?.fullName ? ` to ${selectedDriver.fullName}` : ""}${selectedRoute?.routeName ? ` on route ${selectedRoute.routeName}` : ""} with truck ${bookingTruckId.toUpperCase()}.`,
         orderNo: selectedBooking.orderNo,
         truckId: bookingTruckId,
         type: "assignment_created",
@@ -693,7 +713,7 @@ const OrderManagement = () => {
         title: sendInvoiceChecked ? "Shipment Booked And Invoice Sent" : "Shipment Booked",
         message: sendInvoiceChecked
           ? `Order ${selectedBooking.orderNo} has been booked and your invoice is now available${nextEta ? ` with ETA ${nextEta}` : ""}.`
-          : `Order ${selectedBooking.orderNo} has been booked with driver ${selectedDriver.fullName} on route ${selectedRoute.routeName}${nextEta ? ` with ETA ${nextEta}` : ""}.`,
+          : `Order ${selectedBooking.orderNo} has been booked${selectedDriver?.fullName ? ` with driver ${selectedDriver.fullName}` : ""}${selectedRoute?.routeName ? ` on route ${selectedRoute.routeName}` : ""}${nextEta ? ` with ETA ${nextEta}` : ""}.`,
         customerUid: selectedBooking.customerUid || "",
         customerEmail: selectedBooking.customerEmail || "",
         orderNo: selectedBooking.orderNo,
@@ -890,7 +910,7 @@ const OrderManagement = () => {
                 <Search size={16} className="text-slate-400" />
                 <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-transparent text-sm text-white outline-none" placeholder="Search order no, customer, cargo, or status..." />
               </div>
-              <div className="overflow-auto">
+              <div className="max-h-[65vh] overflow-auto">
                 <table className="w-full min-w-[1200px] text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
@@ -911,33 +931,69 @@ const OrderManagement = () => {
                     ) : filteredCustomers.length === 0 ? (
                       <tr><td colSpan={9} className="px-3 py-4 text-slate-500">No shipment orders.</td></tr>
                     ) : (
-                      filteredCustomers.map((row) => (
-                        <tr key={row.id} className="border-t border-slate-800">
-                          <td className="px-3 py-3 text-white">{row.orderNo}</td>
-                          <td className="px-3 py-3 text-slate-400">{formatTimestamp(row)}</td>
-                          <td className="px-3 py-3 text-slate-300">{row.customerName}</td>
-                          <td className="px-3 py-3 text-slate-300">{row.cargo || "Not specified"}</td>
-                          <td className="px-3 py-3 text-slate-400">{row.weight || "Not specified"}</td>
-                          <td className="px-3 py-3 text-slate-400">{formatLocation(row.origin)}</td>
-                          <td className="px-3 py-3 text-slate-400">{formatLocation(row.destination)}</td>
-                          <td className="px-3 py-3 text-slate-300">{row.status}</td>
-                           <td className="px-3 py-3">
-                             <div className="flex items-center gap-2 flex-wrap">
-                               <button type="button" onClick={() => openBookingPreview(row)} disabled={busyRow === row.id} className="inline-flex items-center gap-1 rounded-md border border-orange-500/40 px-2 py-1 text-xs text-orange-300 hover:bg-orange-500/10">
-                                  <Trash2 size={12} /> Book Shipment
-                                </button>
-                                {row.status === "Shipment Booked" ? (
-                                  <button type="button" onClick={() => setSelectedInvoice(row)} className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-100 hover:bg-slate-800">
+                      filteredCustomers.map((row) => {
+                        const isShipmentBooked =
+                          (row.status || "").toString().trim().toLowerCase() === "shipment booked";
+                        const isShipmentBookingInProgress =
+                          (row.status || "").toString().trim().toLowerCase() === "shipment booking - in progress";
+                        const isTruckAssignedPendingApproval =
+                          (row.status || "").toString().trim().toLowerCase() === "truck assigned - pending approval";
+
+                        return (
+                          <tr key={row.id} className="border-t border-slate-800">
+                            <td className="px-3 py-3 text-white">{row.orderNo}</td>
+                            <td className="px-3 py-3 text-slate-400">{formatTimestamp(row)}</td>
+                            <td className="px-3 py-3 text-slate-300">{row.customerName}</td>
+                            <td className="px-3 py-3 text-slate-300">{row.cargo || "Not specified"}</td>
+                            <td className="px-3 py-3 text-slate-400">{row.weight || "Not specified"}</td>
+                            <td className="px-3 py-3 text-slate-400">{formatLocation(row.origin)}</td>
+                            <td className="px-3 py-3 text-slate-400">{formatLocation(row.destination)}</td>
+                            <td className="px-3 py-3 text-slate-300">{row.status}</td>
+                            <td className="px-3 py-3">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {isShipmentBookingInProgress ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => openBookingPreview(row)}
+                                    disabled={busyRow === row.id}
+                                    className="inline-flex items-center gap-1 rounded-md border border-orange-500/40 px-2 py-1 text-xs text-orange-300 hover:bg-orange-500/10"
+                                  >
+                                    <Trash2 size={12} /> Book Shipment
+                                  </button>
+                                ) : null}
+                                {isTruckAssignedPendingApproval && canApproveTruckAssignment ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => approveTruckAssignment(row)}
+                                    disabled={busyRow === row.id}
+                                    className="inline-flex items-center gap-1 rounded-md border border-emerald-500/40 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-60"
+                                  >
+                                    <CheckCircle2 size={12} /> Approve
+                                  </button>
+                                ) : null}
+                                {isShipmentBooked ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedInvoice(row)}
+                                    className="inline-flex items-center gap-1 rounded-md border border-slate-600 px-2 py-1 text-xs text-slate-100 hover:bg-slate-800"
+                                  >
                                     <Printer size={12} /> Print
                                   </button>
                                 ) : null}
-                                <button type="button" onClick={() => deleteCustomer(row.id)} disabled={busyRow === row.id} className="inline-flex items-center gap-1 rounded-md border border-rose-500/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10 disabled:opacity-60">
+                                <button
+                                  type="button"
+                                  onClick={() => deleteCustomer(row.id)}
+                                  disabled={busyRow === row.id}
+                                  className="inline-flex items-center gap-1 rounded-md border border-rose-500/40 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/10 disabled:opacity-60"
+                                >
                                   <Trash2 size={12} /> Delete
                                 </button>
                               </div>
                             </td>
-                        </tr>
-                      )))}
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -960,7 +1016,7 @@ const OrderManagement = () => {
                   Add Tracking Update
                 </button>
               </div>
-              <div className="overflow-auto">
+              <div className="max-h-[65vh] overflow-auto">
                 <table className="w-full min-w-[700px] text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
@@ -1037,7 +1093,7 @@ const OrderManagement = () => {
                   Add Confirmation
                 </button>
               </div>
-              <div className="overflow-auto">
+              <div className="max-h-[65vh] overflow-auto">
                 <table className="w-full min-w-[700px] text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
@@ -1182,7 +1238,7 @@ const OrderManagement = () => {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-semibold text-white">Order Preview</h3>
-                      <p className="mt-1 text-sm text-slate-400">Review this shipment before invoicing or assigning a truck.</p>
+                      <p className="mt-1 text-sm text-slate-400">Review this shipment, assign a driver, and confirm the booking.</p>
                     </div>
                     <button type="button" onClick={closeBookingPreview} className="rounded-md border border-slate-600 px-3 py-1 text-xs text-slate-200 hover:bg-slate-800">Close</button>
                   </div>
@@ -1206,9 +1262,9 @@ const OrderManagement = () => {
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Assigned Driver</p>
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Assigned Driver (Optional)</p>
                       <select value={selectedDriverId} onChange={(event) => setSelectedDriverId(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-orange-500">
-                        <option value="">Select driver</option>
+                        <option value="">Book without driver</option>
                         {fleetDrivers.map((driver) => (
                           <option key={driver.id} value={driver.id}>
                             {driver.fullName}
@@ -1224,7 +1280,30 @@ const OrderManagement = () => {
                       ) : null}
                     </div>
                     <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Routes Attached To Driver</p>
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Assigned Truck</p>
+                      <select
+                        value={selectedTruckId}
+                        onChange={(event) => setSelectedTruckId(event.target.value)}
+                        disabled={Boolean(selectedDriver?.assignedTruckId)}
+                        className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-orange-500 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <option value="">
+                          {selectedDriver?.assignedTruckId ? "Truck comes from selected driver" : "Select truck"}
+                        </option>
+                        {fleetVehicles.map((vehicle) => (
+                          <option key={vehicle.firestoreId} value={vehicle.id}>
+                            {vehicle.id} {vehicle.type ? `· ${vehicle.type}` : ""} {vehicle.status ? `· ${vehicle.status}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-3 text-xs text-slate-400">
+                        {selectedDriver?.assignedTruckId
+                          ? `This driver is attached to truck ${selectedDriver.assignedTruckId}.`
+                          : "Choose any available fleet truck when a driver has not been assigned yet."}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                      <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Routes Attached To Driver (Optional)</p>
                       <select
                         value={selectedRouteId}
                         onChange={(event) => setSelectedRouteId(event.target.value)}
@@ -1232,7 +1311,7 @@ const OrderManagement = () => {
                         className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-orange-500 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <option value="">
-                          {selectedDriver ? (selectedDriverRoutes.length ? "Select route" : "No route attached") : "Select driver first"}
+                          {selectedDriver ? (selectedDriverRoutes.length ? "Select route if needed" : "No route attached") : "Select driver first"}
                         </option>
                         {selectedDriverRoutes.map((route) => (
                           <option key={route.id} value={route.id}>
@@ -1286,9 +1365,9 @@ const OrderManagement = () => {
                     />
                     <span>Send invoice to client together with the shipment order</span>
                   </label>
-                  {!selectedDriver ? <p className="mt-4 text-sm text-amber-300">Select a driver to load the attached route and vehicle before booking.</p> : null}
+                  {!selectedDriver ? <p className="mt-4 text-sm text-amber-300">Driver assignment is optional. You can still book this shipment with the selected truck.</p> : null}
                   <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                    <button type="button" onClick={bookShipment} disabled={!selectedDriver || !selectedRoute || !resolvedTruckId || busyRow === `book-${selectedBooking.id}`} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
+                    <button type="button" onClick={bookShipment} disabled={!resolvedTruckId || busyRow === `book-${selectedBooking.id}`} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
                       {busyRow === `book-${selectedBooking.id}` ? "Booking..." : "Book Shipment"}
                     </button>
                   </div>

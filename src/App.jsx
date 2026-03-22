@@ -13,8 +13,11 @@ import Drivers from "./Components/Dashboards/Drivers.jsx";
 import DriverAssignments from "./Components/Drivers/DriverAssignments.jsx";
 import StaffDashboard from "./Components/Dashboards/StaffDashboard.jsx";
 import AdminDashboard from "./Components/Dashboards/AdminDashboard.jsx";
+import FleetManagerDashboard from "./Components/Dashboards/FleetManagerDashboard.jsx";
+import AuditorDashboard from "./Components/Dashboards/AuditorDashboard.jsx";
 import OrderManagement from "./Components/AdminFiles/OrderManagement/OrderManagement.jsx";
 import FleetManagement from "./Components/AdminFiles/FleetManagement/FleetManagement.jsx";
+import FleetTruckAssignments from "./Components/AdminFiles/FleetManagement/FleetTruckAssignments.jsx";
 import DriverManagement from "./Components/AdminFiles/FleetManagement/DriverManagement.jsx";
 import RouteManagement from "./Components/AdminFiles/FleetManagement/RouteManagement.jsx";
 import MaintenanceManagement from "./Components/AdminFiles/FleetManagement/MaintenanceManagement.jsx";
@@ -40,6 +43,9 @@ import AccountsDashboard from "./Components/Accounts/AccountsDashboard.jsx";
 import AccountsInvoices from "./Components/Accounts/AccountsInvoices.jsx";
 import AccountsPayments from "./Components/Accounts/AccountsPayments.jsx";
 import AccountsSettings from "./Components/Accounts/AccountsSettings.jsx";
+import AuditTrail from "./Components/Auditor/AuditTrail.jsx";
+import ComplianceReview from "./Components/Auditor/ComplianceReview.jsx";
+import AuditReports from "./Components/Auditor/AuditReports.jsx";
 
 const App = () => {
   return (
@@ -52,6 +58,14 @@ const App = () => {
         <Route path="/customers-onboard" element={<CustomerOnboard />} />
         <Route path="/customers-onboard/register/:accountType" element={<CustomerRegistration />} />
 
+        <Route element={<ProtectedRoute allowedRoles={["customer"]} />}>
+          <Route path="/customer" element={<CustomersDashboard />} />
+          <Route path="/customer/shipments" element={<CustomersShipment />}>
+            <Route index element={<Navigate to="quotations" replace />} />
+            <Route path="quotations" element={<ShipmentQuotationsSection />} />
+            <Route path="requests" element={<ShipmentOrdersSection />} />
+          </Route>
+        </Route>
         <Route element={<ProtectedRoute allowedRoles={["opsuser"]} />}>
           <Route path="/opsuser" element={<CustomersDashboard />} />
           <Route path="/opsuser/shipments" element={<CustomersShipment />}>
@@ -62,6 +76,19 @@ const App = () => {
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["opsmanager"]} />}>
           <Route path="/opsmanager" element={<StaffDashboard />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["fleetmanager"]} />}>
+          <Route path="/fleet-manager" element={<FleetManagerDashboard />} />
+          <Route path="/fleet-manager/vehicles" element={<FleetManagement />} />
+          <Route path="/fleet-manager/assignments" element={<FleetTruckAssignments />} />
+          <Route path="/fleet-manager/compliance" element={<ComplianceManagement />} />
+          <Route path="/fleet-manager/reports" element={<FleetReportsAnalytics />} />
+        </Route>
+        <Route element={<ProtectedRoute allowedRoles={["auditor"]} />}>
+          <Route path="/auditor" element={<AuditorDashboard />} />
+          <Route path="/auditor/audit-trail" element={<AuditTrail />} />
+          <Route path="/auditor/compliance-review" element={<ComplianceReview />} />
+          <Route path="/auditor/reports" element={<AuditReports />} />
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["accounts"]} />}>
           <Route path="/accounts" element={<AccountsWorkspace />}>
@@ -79,14 +106,14 @@ const App = () => {
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route path="/admin" element={<AdminDashboard />} />
         </Route>
-        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["opsuser","opsmanager","admin"]} />}>
           <Route path="/admin/pendingQuotation" element={<PendingQuotations />} />
         </Route>
-        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["opsuser","opsmanager","admin"]} />}>
           <Route path="/admin/quotationsHistory" element={<QuotationHistory />} />
         </Route>
         
-        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["opsuser","opsmanager","admin"]} />}>
           <Route path="/admin/orders" element={<OrderManagement />} />
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>

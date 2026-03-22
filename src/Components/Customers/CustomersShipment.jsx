@@ -18,6 +18,7 @@ import { useAuth } from "../Auth/AuthContext.jsx";
 import { createNotificationRecord } from "../Auth/notificationUtils.js";
 import NavBar from "../Basics/NavBar.jsx";
 import Sidebar from "../Basics/Sidebar.jsx";
+import { getDashboardPathByRole, getShipmentsPathByRole } from "../../utils/roles.js";
 
 const db = getFirestore(app);
 
@@ -42,11 +43,6 @@ const createOrderNumberFromQuotation = (quotationNo, quotationId) =>
     ? quotationNo.replace("QT-", "ORD-")
     : `ORD-${quotationNo || quotationId}`;
 
-const shipmentSections = [
-  { label: "My Quotations", to: "/opsuser/shipments/quotations" },
-  { label: "Shipment Requests", to: "/opsuser/shipments/requests" },
-];
-
 const CustomersShipment = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orders, setOrders] = useState([]);
@@ -56,6 +52,11 @@ const CustomersShipment = () => {
   const [busyQuotationId, setBusyQuotationId] = useState("");
   const { user } = useAuth();
   const location = useLocation();
+  const dashboardPath = getDashboardPathByRole(user?.role);
+  const shipmentSections = [
+    { label: "My Quotations", to: getShipmentsPathByRole(user?.role, "quotations") },
+    { label: "Shipment Requests", to: getShipmentsPathByRole(user?.role, "requests") },
+  ];
 
   useEffect(() => {
     const loadCustomerRecords = async () => {
@@ -170,6 +171,7 @@ const CustomersShipment = () => {
         await setDoc(doc(db, "customer_order", quotationId), {
           quotationId: targetQuotation.id,
           quotationNo: targetQuotation.quotationNo || "",
+          trackingId: targetQuotation.trackingId || "",
           orderNo,
           customerName: targetQuotation.customerName || user?.displayName || "Customer",
           customerUid: user?.uid || targetQuotation.customerUid || "",
@@ -235,6 +237,7 @@ const CustomersShipment = () => {
               id: quotationId,
               quotationId: targetQuotationRecord.id,
               quotationNo: targetQuotationRecord.quotationNo || "",
+              trackingId: targetQuotationRecord.trackingId || "",
               orderNo: createOrderNumberFromQuotation(
                 targetQuotationRecord.quotationNo,
                 targetQuotationRecord.id,
@@ -346,6 +349,7 @@ const CustomersShipment = () => {
                   formatLocation,
                   formatDimensions,
                   formatCurrency,
+                  dashboardPath,
                 }}
               />
             </section>

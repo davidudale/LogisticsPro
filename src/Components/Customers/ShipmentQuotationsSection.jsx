@@ -48,6 +48,7 @@ const ShipmentQuotationsSection = () => {
     formatLocation,
     formatDimensions,
     formatCurrency,
+    dashboardPath,
   } = useOutletContext();
   const [breakdownPreview, setBreakdownPreview] = useState(null);
   const [negotiationModal, setNegotiationModal] = useState(null);
@@ -70,7 +71,7 @@ const ShipmentQuotationsSection = () => {
           <h3 className="text-lg font-semibold text-white">My Quotations</h3>
         </div>
         <Link
-          to="/opsuser"
+          to={dashboardPath}
           state={{ openQuotationModal: true }}
           className="inline-flex items-center gap-2 self-start rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700"
         >
@@ -175,7 +176,7 @@ const ShipmentQuotationsSection = () => {
                       <td className="px-3 py-4">
                         {quotation.status === "SAVE" ? (
                           <Link
-                            to="/opsuser"
+                            to={dashboardPath}
                             state={{ openQuotationModal: true, editQuotation: quotation }}
                             className="inline-flex rounded-lg border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-800"
                           >

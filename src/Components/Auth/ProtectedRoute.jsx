@@ -1,7 +1,10 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext.jsx";
-
-const getRoleHomePath = (role) => `/${role || "opsuser"}`;
+import {
+  canAccessRole,
+  getDashboardPathByRole,
+  isEmailVerificationRequired,
+} from "../../utils/roles.js";
 
 const ProtectedRoute = ({ allowedRoles = [] }) => {
   const { user, loading } = useAuth();
@@ -19,17 +22,12 @@ const ProtectedRoute = ({ allowedRoles = [] }) => {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (
-    !user.emailVerified
-    && user.role !== "admin"
-    && user.role !== "driver"
-    && user.role !== "accounts"
-  ) {
+  if (!user.emailVerified && isEmailVerificationRequired(user.role)) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
-    return <Navigate to={getRoleHomePath(user.role)} replace />;
+  if (!canAccessRole(user.role, allowedRoles)) {
+    return <Navigate to={getDashboardPathByRole(user.role)} replace />;
   }
 
   return <Outlet />;

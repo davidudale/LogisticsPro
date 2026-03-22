@@ -1,64 +1,293 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  Activity,
+  ArrowRight,
+  Boxes,
+  ClipboardList,
+  Clock3,
+  RefreshCw,
+  ShieldCheck,
+  Truck,
+  UserCog,
+  Users,
+} from "lucide-react";
+import { collection, getDocs, getFirestore } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import NavBar from "../Basics/NavBar.jsx";
 import Sidebar from "../Basics/Sidebar.jsx";
-import { Activity, ClipboardList, Truck, Users } from "lucide-react";
+import { app } from "../Auth/firebase";
+
+const db = getFirestore(app);
+
+const COLLECTIONS = {
+  quotations: "Quotations",
+  orders: "customer_order",
+  customers: "customers",
+  users: "users",
+  fleetVehicles: "fleet_vehicles",
+};
+
+const getTimestampValue = (value) => {
+  if (!value) return 0;
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
+  const parsedValue = new Date(value).getTime();
+  return Number.isNaN(parsedValue) ? 0 : parsedValue;
+};
+
+const formatTimestamp = (value) => {
+  const timestamp = getTimestampValue(value);
+  if (!timestamp) return "Not available";
+  return new Intl.DateTimeFormat("en-NG", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestamp));
+};
+
+const pendingQuotationStatuses = new Set([
+  "pending",
+  "save",
+  "quotation under negotiation",
+  "quotation sent and pending client review",
+]);
+
+const closedOrderStatuses = new Set(["delivered", "cancelled", "closed"]);
+
+const mapSnapshotDocs = (snapshot) =>
+  snapshot.docs.map((item) => ({
+    id: item.id,
+    ...item.data(),
+  }));
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const stats = [
-    { label: "Orders Today", value: "124", icon: ClipboardList },
-    { label: "Active Fleet", value: "42", icon: Truck },
-    { label: "Live Ops", value: "18", icon: Activity },
-    { label: "Clients", value: "63", icon: Users },
+  const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState({
+    quotations: [],
+    orders: [],
+    customers: [],
+    users: [],
+    fleetVehicles: [],
+  });
+
+  const loadDashboard = async () => {
+    setLoading(true);
+    try {
+      const [quotationSnap, orderSnap, customerSnap, userSnap, fleetSnap] =
+        await Promise.all([
+          getDocs(collection(db, COLLECTIONS.quotations)),
+          getDocs(collection(db, COLLECTIONS.orders)),
+          getDocs(collection(db, COLLECTIONS.customers)),
+          getDocs(collection(db, COLLECTIONS.users)),
+          getDocs(collection(db, COLLECTIONS.fleetVehicles)),
+        ]);
+
+      setDashboardData({
+        quotations: mapSnapshotDocs(quotationSnap),
+        orders: mapSnapshotDocs(orderSnap),
+        customers: mapSnapshotDocs(customerSnap),
+        users: mapSnapshotDocs(userSnap),
+        fleetVehicles: mapSnapshotDocs(fleetSnap),
+      });
+    } catch (error) {
+      toast.error(error?.message || "Failed to load admin dashboard.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDashboard();
+  }, []);
+
+  const metrics = useMemo(() => {
+    const pendingQuotations = dashboardData.quotations.filter((quotation) =>
+      pendingQuotationStatuses.has(
+        (quotation.status || "").toString().trim().toLowerCase(),
+      ),
+    ).length;
+
+    const activeOrders = dashboardData.orders.filter(
+      (order) =>
+        !closedOrderStatuses.has(
+          (order.status || "").toString().trim().toLowerCase(),
+        ),
+    ).length;
+
+    const verifiedUsers = dashboardData.users.filter(
+      (user) => user.emailVerified === true,
+    ).length;
+    const activeFleet = dashboardData.fleetVehicles.filter(
+      (vehicle) =>
+        (vehicle.status || "").toString().trim().toLowerCase() !== "inactive",
+    ).length;
+
+    const recentActivity = [
+      ...dashboardData.quotations.map((quotation) => ({
+        id: `quotation:${quotation.id}`,
+        title: quotation.quotationNo || quotation.id,
+        subtitle:
+          quotation.customerName ||
+          quotation.customerEmail ||
+          "Quotation request",
+        status: quotation.status || "Pending",
+        type: "Quotation",
+        updatedAt: quotation.updatedAt || quotation.createdAt,
+      })),
+      ...dashboardData.orders.map((order) => ({
+        id: `order:${order.id}`,
+        title: order.orderNo || order.id,
+        subtitle: order.customerName || order.customerEmail || "Shipment order",
+        status: order.status || "Created",
+        type: "Order",
+        updatedAt: order.updatedAt || order.createdAt,
+      })),
+      ...dashboardData.users.map((user) => ({
+        id: `user:${user.id}`,
+        title: user.fullName || user.name || user.email || user.id,
+        subtitle: user.email || "User profile",
+        status: user.role || "No role",
+        type: "User",
+        updatedAt: user.updatedAt || user.createdAt,
+      })),
+    ]
+      .sort(
+        (left, right) =>
+          getTimestampValue(right.updatedAt) -
+          getTimestampValue(left.updatedAt),
+      )
+      .slice(0, 7);
+
+    return {
+      pendingQuotations,
+      activeOrders,
+      totalCustomers: dashboardData.customers.length,
+      activeFleet,
+      verifiedUsers,
+      totalUsers: dashboardData.users.length,
+      recentActivity,
+    };
+  }, [dashboardData]);
+
+  const statCards = [
+    {
+      label: "Pending Quotations",
+      value: metrics.pendingQuotations,
+      detail: "Needs review or pricing follow-up",
+      icon: ClipboardList,
+      tone: "text-orange-300",
+    },
+    {
+      label: "Active Orders",
+      value: metrics.activeOrders,
+      detail: "Open shipment work in progress",
+      icon: Activity,
+      tone: "text-emerald-300",
+    },
+    {
+      label: "Fleet Availability",
+      value: metrics.activeFleet,
+      detail: "Vehicles not marked inactive",
+      icon: Truck,
+      tone: "text-sky-300",
+    },
+    {
+      label: "Customer Accounts",
+      value: metrics.totalCustomers,
+      detail: `${metrics.verifiedUsers}/${metrics.totalUsers} verified user profiles`,
+      icon: Users,
+      tone: "text-white",
+    },
+  ];
+
+  const quickActions = [
+    {
+      label: "Pending Quotations",
+      description: "Review pricing requests and move the queue forward.",
+      to: "/admin/pendingQuotation",
+    },
+    {
+      label: "Shipment Orders",
+      description: "Check order progress, assignments, and live execution.",
+      to: "/admin/orders",
+    },
+    {
+      label: "Fleet Management",
+      description: "Inspect assets, readiness, and maintenance pressure.",
+      to: "/admin/fleet",
+    },
+    {
+      label: "Users Management",
+      description: "Adjust access and keep role coverage current.",
+      to: "/admin/users",
+    },
   ];
 
   return (
-    <div className="flex flex-col min-h-screen bg-slate-950 text-slate-200">
+    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-200">
       <NavBar
         title="Admin Dashboard"
         onToggleSidebar={() => setSidebarOpen(true)}
       />
       <div className="flex flex-1 min-h-screen">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-        <main className="flex-1 ml-16 lg:ml-64 p-4 lg:p-8 min-h-[calc(100vh-65px)] overflow-y-auto bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-slate-900/50 via-slate-950 to-slate-950">
-          <div className="max-w-7xl mx-auto">
-            <header className="mb-8">
-              <h1 className="text-3xl font-bold text-white tracking-tight">System Overview</h1>
-              <p className="text-slate-400 text-sm mt-1">
-                Monitor operations, fleet readiness, and order velocity.
-              </p>
+        <main className="flex-1 ml-16 min-h-[calc(100vh-65px)] overflow-y-auto bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-slate-900/50 via-slate-950 to-slate-950 p-4 lg:ml-64 lg:p-8">
+          <div className="mx-auto max-w-7xl space-y-6">
+            <header className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/50">
+              <div className="relative px-6 py-7 lg:px-8">
+                <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.18),transparent_62%)]" />
+                <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-3xl">
+                    <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
+                      Control Center
+                    </p>
+                    <h1 className="mt-3 text-3xl font-bold text-white lg:text-4xl">
+                      Executive Operations Overview
+                    </h1>
+                    <p className="mt-3 text-sm text-slate-400 lg:text-base">
+                      Keep quotations moving, watch fleet readiness, and monitor
+                      customer-facing execution from one admin workspace.
+                    </p>
+                  </div>
+                  {/*<button
+                    type="button"
+                    onClick={loadDashboard}
+                    disabled={loading}
+                    className="inline-flex items-center justify-center gap-2 self-start rounded-2xl border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm font-semibold text-orange-100 transition hover:border-orange-400 hover:bg-orange-500/20 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    <RefreshCw
+                      size={16}
+                      className={loading ? "animate-spin" : ""}
+                    />
+                    {loading ? "Refreshing..." : "Refresh Snapshot"}
+                  </button>*/}
+                </div>
+              </div>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
-              {stats.map((stat) => {
-                const Icon = stat.icon;
-                return (
-                  <div
-                    key={stat.label}
-                    className="group p-6 rounded-2xl border border-slate-800 bg-slate-900/40 hover:bg-slate-900/60 transition-all"
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <div className="p-2 bg-slate-950 rounded-lg border border-slate-800 group-hover:border-orange-500/50 transition-colors">
-                        <Icon className="text-orange-500" size={18} />
-                      </div>
-                    </div>
-                    <p className="text-slate-400 text-xs font-medium uppercase tracking-tight">
-                      {stat.label}
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {statCards.map(({ label, value, detail, icon: Icon, tone }) => (
+                <div
+                  key={label}
+                  className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                      {label}
                     </p>
-                    <p className="text-3xl font-bold text-white mt-1">{stat.value}</p>
+                    <Icon size={18} className="text-orange-400" />
                   </div>
-                );
-              })}
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
-              <h2 className="font-bold text-white uppercase tracking-tight text-sm">
-                LogisticsPro Activity Log
-              </h2>
-              <p className="mt-4 text-sm text-slate-400">
-                Orders, dispatch events, and compliance updates will appear here.
-              </p>
-            </div>
+                  <p className={`mt-3 text-3xl font-bold ${tone}`}>
+                    {loading ? "--" : value}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-400">{detail}</p>
+                </div>
+              ))}
+            </section>
           </div>
         </main>
       </div>

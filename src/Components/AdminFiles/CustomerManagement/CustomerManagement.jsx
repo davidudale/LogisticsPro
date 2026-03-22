@@ -511,7 +511,7 @@ const CustomerManagement = () => {
                 <Search size={16} className="text-slate-400" />
                 <input value={query} onChange={(e) => setQuery(e.target.value)} className="w-full bg-transparent text-sm text-white outline-none" placeholder="Search company, contact, email, registration no, or industry..." />
               </div>
-              <div className="overflow-auto">
+              <div className="max-h-[65vh] overflow-auto">
                 <table className="w-full min-w-[1180px] text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
@@ -658,7 +658,7 @@ const CustomerManagement = () => {
                   Add Order
                 </button>
               </div>
-              <div className="overflow-auto">
+              <div className="max-h-[65vh] overflow-auto">
                 <table className="w-full min-w-[700px] text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
@@ -735,7 +735,7 @@ const CustomerManagement = () => {
                   Add Ticket
                 </button>
               </div>
-              <div className="overflow-auto">
+              <div className="max-h-[65vh] overflow-auto">
                 <table className="w-full min-w-[700px] text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">

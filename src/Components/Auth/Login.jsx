@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowBigLeftIcon, Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useAuth } from "./AuthContext.jsx";
+import { getDashboardPathByRole, isEmailVerificationRequired } from "../../utils/roles.js";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -13,9 +14,10 @@ const Login = () => {
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    const canEnterDashboard = user?.role && (user?.emailVerified || user?.role === "admin");
+    const canEnterDashboard = user?.role
+      && (user?.emailVerified || !isEmailVerificationRequired(user.role));
     if (!authLoading && canEnterDashboard) {
-      navigate(`/${user.role}`);
+      navigate(getDashboardPathByRole(user.role));
     }
   }, [authLoading, navigate, user?.emailVerified, user?.role]);
 

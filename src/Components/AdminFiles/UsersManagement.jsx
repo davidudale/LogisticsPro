@@ -26,17 +26,15 @@ import { toast } from "react-toastify";
 import NavBar from "../Basics/NavBar.jsx";
 import Sidebar from "../Basics/Sidebar.jsx";
 import { app, secondaryAuth } from "../Auth/firebase.js";
+import {
+  ROLE,
+  ROLE_OPTIONS,
+  formatRoleLabel,
+  normalizeRole,
+} from "../../utils/roles.js";
 
 const db = getFirestore(app);
 const USERS_COLLECTION = "users";
-
-const roleOptions = [
-  { value: "admin", label: "Admin", detail: "Full platform control" },
-  { value: "opsmanager", label: "Ops Manager", detail: "Operational oversight and dispatch" },
-  { value: "accounts", label: "Accounts", detail: "Invoicing and payment workflows" },
-  { value: "driver", label: "Driver", detail: "Driver dashboard and assignments" },
-  { value: "opsuser", label: "Ops User", detail: "Customer shipment workflow access" },
-];
 
 const accountStatusOptions = [
   { value: "active", label: "Active" },
@@ -50,7 +48,7 @@ const emptyCreateForm = {
   phone: "",
   password: "",
   confirmPassword: "",
-  role: "opsuser",
+  role: ROLE.FLEETMANAGER,
   accountStatus: "pending",
 };
 
@@ -58,7 +56,7 @@ const emptyEditForm = {
   fullName: "",
   email: "",
   phone: "",
-  role: "opsuser",
+  role: ROLE.FLEETMANAGER,
   accountStatus: "active",
 };
 
@@ -82,24 +80,10 @@ const formatTimestamp = (value) => {
   }).format(new Date(timestamp));
 };
 
-const normalizeRole = (value) => {
-  const role = (value || "").toString().trim().toLowerCase();
-  if (role === "opsmanager" || role === "staff") return "opsmanager";
-  if (role === "accounts" || role === "account") return "accounts";
-  if (role === "driver" || role === "drivers") return "driver";
-  if (role === "admin") return "admin";
-  return "opsuser";
-};
-
 const normalizeStatus = (value) => {
   const status = (value || "").toString().trim().toLowerCase();
   if (["active", "pending", "invited"].includes(status)) return status;
   return "active";
-};
-
-const formatRoleLabel = (role) => {
-  const match = roleOptions.find((item) => item.value === normalizeRole(role));
-  return match?.label || "Ops User";
 };
 
 const formatStatusLabel = (status) => {
@@ -113,6 +97,10 @@ const getRoleBadgeClass = (role) => {
       return "border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-200";
     case "opsmanager":
       return "border-orange-500/30 bg-orange-500/10 text-orange-200";
+    case "fleetmanager":
+      return "border-cyan-500/30 bg-cyan-500/10 text-cyan-200";
+    case "auditor":
+      return "border-violet-500/30 bg-violet-500/10 text-violet-200";
     case "accounts":
       return "border-emerald-500/30 bg-emerald-500/10 text-emerald-200";
     case "driver":
@@ -223,7 +211,7 @@ const UsersManagement = () => {
     [users],
   );
   const privilegedUsers = useMemo(
-    () => users.filter((user) => ["admin", "opsmanager", "accounts"].includes(user.role)).length,
+    () => users.filter((user) => ["admin", "opsmanager", "fleetmanager", "auditor", "accounts"].includes(user.role)).length,
     [users],
   );
 
@@ -453,7 +441,7 @@ const UsersManagement = () => {
                     className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none transition focus:border-orange-500"
                   >
                     <option value="all">All roles</option>
-                    {roleOptions.map((role) => (
+                    {ROLE_OPTIONS.map((role) => (
                       <option key={role.value} value={role.value}>
                         {role.label}
                       </option>
@@ -463,7 +451,7 @@ const UsersManagement = () => {
               </div>
 
               <div className="mt-5 overflow-hidden rounded-2xl border border-slate-800">
-                <div className="overflow-x-auto">
+                <div className="max-h-[65vh] overflow-auto">
                   <table className="min-w-full divide-y divide-slate-800 text-sm">
                     <thead className="bg-slate-950/90 text-slate-400">
                       <tr>
@@ -631,10 +619,10 @@ const UsersManagement = () => {
                     onChange={(event) => setCreateForm((prev) => ({ ...prev, role: event.target.value }))}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-500"
                   >
-                    {roleOptions.map((role) => (
-                      <option key={role.value} value={role.value}>
-                        {role.label}
-                      </option>
+                     {ROLE_OPTIONS.map((role) => (
+                       <option key={role.value} value={role.value}>
+                         {role.label}
+                       </option>
                     ))}
                   </select>
                 </label>
@@ -659,7 +647,7 @@ const UsersManagement = () => {
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-400">
                   <p className="font-semibold text-white">{formatRoleLabel(createForm.role)}</p>
                   <p className="mt-2">
-                    {roleOptions.find((role) => role.value === createForm.role)?.detail}
+                    {ROLE_OPTIONS.find((role) => role.value === createForm.role)?.detail}
                   </p>
                 </div>
 
@@ -782,7 +770,7 @@ const UsersManagement = () => {
                     onChange={(event) => setEditForm((prev) => ({ ...prev, role: event.target.value }))}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-500"
                   >
-                    {roleOptions.map((role) => (
+                    {ROLE_OPTIONS.map((role) => (
                       <option key={role.value} value={role.value}>
                         {role.label}
                       </option>

@@ -690,7 +690,7 @@ const PendingQuotations = () => {
                       {filteredQuotations.length} request{filteredQuotations.length === 1 ? "" : "s"}
                     </p>
                   </div>
-                  <div className="overflow-x-auto">
+                  <div className="max-h-[65vh] overflow-auto">
                     <table className="min-w-[1320px] w-full text-left">
                       <thead className="bg-slate-900/80">
                         <tr className="border-b border-slate-800">

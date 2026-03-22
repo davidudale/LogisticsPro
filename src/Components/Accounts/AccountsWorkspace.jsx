@@ -132,7 +132,7 @@ const AccountsWorkspace = () => {
       sortedOrders.filter(
         (order) =>
           Number(order.quoteTotal || 0) > 0
-          || ["shipment booked", "truck assigned"].includes((order.status || "").toLowerCase()),
+          || ["shipment booked", "truck assigned - pending approval"].includes((order.status || "").toLowerCase()),
       ),
     [sortedOrders],
   );

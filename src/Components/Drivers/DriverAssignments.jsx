@@ -142,7 +142,7 @@ const DriverAssignments = () => {
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-2xl border border-slate-800">
-                  <div className="overflow-x-auto">
+                  <div className="max-h-[65vh] overflow-auto">
                     <table className="min-w-[1000px] w-full text-left text-sm">
                       <thead className="bg-slate-900/80">
                         <tr className="border-b border-slate-800 text-xs uppercase tracking-[0.12em] text-slate-400">

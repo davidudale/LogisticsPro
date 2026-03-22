@@ -1,6 +1,27 @@
-import React, { useEffect, useRef, useState } from "react";
-import { addDoc, collection, doc, getFirestore, serverTimestamp, updateDoc } from "firebase/firestore";
-import { Activity, ClipboardList, Crosshair, LoaderCircle, MapPin, Package, Plus } from "lucide-react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDocs,
+  getFirestore,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+} from "firebase/firestore";
+import {
+  Activity,
+  ArrowRight,
+  ClipboardList,
+  Crosshair,
+  LoaderCircle,
+  MapPin,
+  Package,
+  Plus,
+  ReceiptText,
+  RefreshCw,
+} from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { app } from "../Auth/firebase";
@@ -11,12 +32,33 @@ import Sidebar from "../Basics/Sidebar.jsx";
 import { nigeriaLocations, nigeriaStates } from "../../data/nigeriaLocations.js";
 import { useGeolocation } from "../../hooks/useGeolocation.js";
 import { isGoogleMapsConfigured, loadGoogleMaps } from "../../Services/googleMaps.js";
+import { getShipmentsPathByRole } from "../../utils/roles.js";
 
 const db = getFirestore(app);
 const createQuotationNumber = () => `QT-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`;
+const createTrackingId = () => `TRK-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`;
 const addressComponentLookup = {
   state: ["administrative_area_level_1"],
   lga: ["administrative_area_level_2", "locality", "sublocality_level_1"],
+};
+
+const getTimestampValue = (value) => {
+  if (!value) return 0;
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
+  const parsedValue = new Date(value).getTime();
+  return Number.isNaN(parsedValue) ? 0 : parsedValue;
+};
+
+const formatTimestamp = (value) => {
+  const timestampValue = getTimestampValue(value);
+  if (!timestampValue) return "Not available";
+  return new Intl.DateTimeFormat("en-NG", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(timestampValue));
 };
 
 const resolveAddressComponent = (components = [], candidateTypes = []) => {
@@ -54,6 +96,7 @@ const initialAddressSuggestions = {
 const initialOrderForm = {
   id: "",
   quotationNo: "",
+  trackingId: "",
   customerName: "",
   originState: "",
   originLga: "",
@@ -81,9 +124,15 @@ const CustomersDashboard = () => {
   const [mapsError, setMapsError] = useState("");
   const [addressSuggestions, setAddressSuggestions] = useState(initialAddressSuggestions);
   const [routePreview, setRoutePreview] = useState(null);
+  const [recordsLoading, setRecordsLoading] = useState(true);
+  const [customerOrders, setCustomerOrders] = useState([]);
+  const [customerQuotations, setCustomerQuotations] = useState([]);
+  const [trackingLookup, setTrackingLookup] = useState("");
   const { user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const quotationsPath = getShipmentsPathByRole(user?.role, "quotations");
+  const requestsPath = getShipmentsPathByRole(user?.role, "requests");
   const autocompleteServiceRef = useRef(null);
   const geocoderRef = useRef(null);
   const suggestionHideTimeoutRef = useRef(null);
@@ -105,13 +154,6 @@ const CustomersDashboard = () => {
     stopWatching,
     resetError: resetGeolocationError,
   } = useGeolocation();
-  const stats = [
-    { label: "Open Orders", value: "8", icon: ClipboardList },
-    { label: "In Transit", value: "5", icon: MapPin },
-    { label: "Delivered", value: "37", icon: Package },
-    { label: "Satisfaction", value: "4.9/5", icon: Activity },
-  ];
-
   useEffect(() => {
     if (!isGoogleMapsConfigured()) {
       setMapsError("Set VITE_GOOGLE_MAPS_API_KEY to enable Google address suggestions.");
@@ -273,6 +315,7 @@ const CustomersDashboard = () => {
     setOrderForm((prev) => ({
       ...initialOrderForm,
       quotationNo: createQuotationNumber(),
+      trackingId: createTrackingId(),
       customerName: prev.customerName || user?.displayName || "",
     }));
     setAddressSuggestions(initialAddressSuggestions);
@@ -287,6 +330,7 @@ const CustomersDashboard = () => {
         setOrderForm({
           id: draftQuotation.id || "",
           quotationNo: draftQuotation.quotationNo || createQuotationNumber(),
+          trackingId: draftQuotation.trackingId || createTrackingId(),
           customerName: draftQuotation.customerName || user?.displayName || "",
           originState: draftQuotation.origin?.state || "",
           originLga: draftQuotation.origin?.lga || "",
@@ -526,6 +570,57 @@ const CustomersDashboard = () => {
     resolveCurrentLocationDetails(activeGeoTarget, currentPosition);
   }, [activeGeoTarget, currentPosition, isCreateOrderOpen, mapsReady]);
 
+  useEffect(() => {
+    const loadCustomerRecords = async () => {
+      if (!user?.uid && !user?.email) {
+        setCustomerOrders([]);
+        setCustomerQuotations([]);
+        setRecordsLoading(false);
+        return;
+      }
+
+      setRecordsLoading(true);
+      try {
+        const ordersRef = collection(db, "customer_order");
+        const quotationsRef = collection(db, "Quotations");
+        const [
+          orderUidSnap,
+          orderEmailSnap,
+          quotationUidSnap,
+          quotationEmailSnap,
+        ] = await Promise.all([
+          user?.uid ? getDocs(query(ordersRef, where("customerUid", "==", user.uid))) : Promise.resolve(null),
+          user?.email ? getDocs(query(ordersRef, where("customerEmail", "==", user.email))) : Promise.resolve(null),
+          user?.uid ? getDocs(query(quotationsRef, where("customerUid", "==", user.uid))) : Promise.resolve(null),
+          user?.email ? getDocs(query(quotationsRef, where("customerEmail", "==", user.email))) : Promise.resolve(null),
+        ]);
+
+        const orderRecords = new Map();
+        [orderUidSnap, orderEmailSnap].forEach((snapshot) => {
+          snapshot?.docs.forEach((item) => {
+            orderRecords.set(item.id, { id: item.id, ...item.data() });
+          });
+        });
+
+        const quotationRecords = new Map();
+        [quotationUidSnap, quotationEmailSnap].forEach((snapshot) => {
+          snapshot?.docs.forEach((item) => {
+            quotationRecords.set(item.id, { id: item.id, ...item.data() });
+          });
+        });
+
+        setCustomerOrders(Array.from(orderRecords.values()));
+        setCustomerQuotations(Array.from(quotationRecords.values()));
+      } catch (error) {
+        toast.error(error?.message || "Failed to load your dashboard records.");
+      } finally {
+        setRecordsLoading(false);
+      }
+    };
+
+    loadCustomerRecords();
+  }, [user?.uid, user?.email]);
+
   const applyCurrentLocation = async (target) => {
     resetGeolocationError();
 
@@ -546,9 +641,10 @@ const CustomersDashboard = () => {
     );
   };
 
-  const buildQuotationPayload = (resolvedQuotationNo, status) => ({
-    quotationNo: resolvedQuotationNo,
-    customerName: orderForm.customerName.trim(),
+const buildQuotationPayload = (resolvedQuotationNo, status) => ({
+  quotationNo: resolvedQuotationNo,
+  trackingId: orderForm.trackingId.trim(),
+  customerName: orderForm.customerName.trim(),
     origin: {
       state: orderForm.originState.trim(),
       lga: orderForm.originLga.trim(),
@@ -664,6 +760,118 @@ const CustomersDashboard = () => {
 
   const originLgas = orderForm.originState ? nigeriaLocations[orderForm.originState] || [] : [];
   const destinationLgas = orderForm.destinationState ? nigeriaLocations[orderForm.destinationState] || [] : [];
+  const deliveredStatuses = new Set(["delivered", "completed", "closed"]);
+  const transitStatuses = new Set(["shipment booked", "shipment booking - in progress", "in transit", "assigned"]);
+
+  const dashboardMetrics = useMemo(() => {
+    const openOrders = customerOrders.filter((order) => !deliveredStatuses.has((order.status || "").toString().trim().toLowerCase())).length;
+    const inTransit = customerOrders.filter((order) => transitStatuses.has((order.status || "").toString().trim().toLowerCase())).length;
+    const delivered = customerOrders.filter((order) => deliveredStatuses.has((order.status || "").toString().trim().toLowerCase())).length;
+    const activeQuotations = customerQuotations.filter((quotation) => {
+      const normalizedStatus = (quotation.status || "").toString().trim().toLowerCase();
+      return normalizedStatus !== "save" && normalizedStatus !== "quotation accepted";
+    }).length;
+
+    const recentActivity = [
+      ...customerQuotations.map((quotation) => ({
+        id: `quotation:${quotation.id}`,
+        title: quotation.trackingId || quotation.quotationNo || quotation.id,
+        subtitle: quotation.cargo || quotation.customerName || "Quotation request",
+        status: quotation.status || "Pending",
+        updatedAt: quotation.updatedAt || quotation.createdAt,
+        to: quotationsPath,
+      })),
+      ...customerOrders.map((order) => ({
+        id: `order:${order.id}`,
+        title: order.trackingId || order.orderNo || order.id,
+        subtitle: order.deliveryAddress || order.cargo || "Shipment order",
+        status: order.status || "Created",
+        updatedAt: order.updatedAt || order.createdAt,
+        to: requestsPath,
+      })),
+    ]
+      .sort((left, right) => getTimestampValue(right.updatedAt) - getTimestampValue(left.updatedAt))
+      .slice(0, 6);
+
+    return {
+      openOrders,
+      inTransit,
+      delivered,
+      activeQuotations,
+      recentActivity,
+    };
+  }, [customerOrders, customerQuotations, quotationsPath, requestsPath]);
+
+  const stats = [
+    { label: "Open Orders", value: dashboardMetrics.openOrders, icon: ClipboardList, detail: "Orders still active in the workflow" },
+    { label: "In Transit", value: dashboardMetrics.inTransit, icon: MapPin, detail: "Shipments currently moving or assigned" },
+    { label: "Delivered", value: dashboardMetrics.delivered, icon: Package, detail: "Orders marked delivered or closed" },
+    { label: "Active Quotations", value: dashboardMetrics.activeQuotations, icon: Activity, detail: "Requests still under review or negotiation" },
+  ];
+
+  const quickActions = [
+    {
+      label: "Create quotation",
+      description: "Start a new shipment pricing request with route and cargo details.",
+      action: openCreateQuotationModal,
+    },
+    {
+      label: "Open quotations",
+      description: "Review pending quotes, pricing breakdowns, and negotiations.",
+      action: () => navigate(quotationsPath),
+    },
+    {
+      label: "Check shipment requests",
+      description: "Track accepted quotations that became active orders.",
+      action: () => navigate(requestsPath),
+    },
+  ];
+
+  const trackingLookupResult = useMemo(() => {
+    const value = trackingLookup.trim().toLowerCase();
+    if (!value) return null;
+
+    const matchingOrder = customerOrders.find((order) =>
+      [
+        order.trackingId,
+        order.orderNo,
+        order.quotationNo,
+      ]
+        .filter(Boolean)
+        .some((item) => item.toString().trim().toLowerCase() === value),
+    );
+
+    if (matchingOrder) {
+      return {
+        type: "Order",
+        title: matchingOrder.trackingId || matchingOrder.orderNo || matchingOrder.id,
+        subtitle: matchingOrder.deliveryAddress || matchingOrder.cargo || "Shipment order",
+        status: matchingOrder.status || "Created",
+        to: requestsPath,
+      };
+    }
+
+    const matchingQuotation = customerQuotations.find((quotation) =>
+      [
+        quotation.trackingId,
+        quotation.quotationNo,
+      ]
+        .filter(Boolean)
+        .some((item) => item.toString().trim().toLowerCase() === value),
+    );
+
+    if (matchingQuotation) {
+      return {
+        type: "Quotation",
+        title: matchingQuotation.trackingId || matchingQuotation.quotationNo || matchingQuotation.id,
+        subtitle: matchingQuotation.cargo || matchingQuotation.customerName || "Quotation request",
+        status: matchingQuotation.status || "Pending",
+        to: quotationsPath,
+      };
+    }
+
+    return { type: "Missing" };
+  }, [customerOrders, customerQuotations, quotationsPath, requestsPath, trackingLookup]);
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-200">
@@ -674,26 +882,40 @@ const CustomersDashboard = () => {
       <div className="flex flex-1 min-h-screen">
         <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         <main className="flex-1 ml-16 lg:ml-64 p-4 lg:p-8 min-h-[calc(100vh-65px)] overflow-y-auto bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-slate-900/50 via-slate-950 to-slate-950">
-          <div className="max-w-7xl mx-auto">
-            <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-white tracking-tight">Shipment Visibility</h1>
-                <p className="text-slate-400 text-sm mt-1">
-                  Track orders, delivery milestones, and customer service updates.
-                </p>
-              </div>
+          <div className="max-w-7xl mx-auto space-y-6">
+            <header className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/50">
+              <div className="relative px-6 py-7 lg:px-8">
+                <div className="absolute inset-y-0 right-0 w-1/2 bg-[radial-gradient(circle_at_top_right,rgba(249,115,22,0.18),transparent_62%)]" />
+                <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-3xl">
+                    <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Customer Workspace</p>
+                    <h1 className="mt-3 text-3xl font-bold text-white lg:text-4xl">Shipment Visibility</h1>
+                    
+                  </div>
 
-              <button
-                type="button"
-                onClick={openCreateQuotationModal}
-                className="inline-flex items-center gap-2 rounded-xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-700"
-              >
-                <Plus size={16} />
-                Get Quotation
-              </button>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => navigate(quotationsPath)}
+                      className="inline-flex items-center gap-2 rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm font-semibold text-slate-100 transition hover:border-slate-500 hover:bg-slate-900"
+                    >
+                      <ReceiptText size={16} />
+                      My Quotations
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openCreateQuotationModal}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-orange-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-700"
+                    >
+                      <Plus size={16} />
+                      Get Quotation
+                    </button>
+                  </div>
+                </div>
+              </div>
             </header>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
+            <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
               {stats.map((stat) => {
                 const Icon = stat.icon;
                 return (
@@ -707,11 +929,154 @@ const CustomersDashboard = () => {
                     <p className="text-slate-400 text-xs font-medium uppercase tracking-tight mt-4">
                       {stat.label}
                     </p>
-                    <p className="text-3xl font-bold text-white mt-1">{stat.value}</p>
+                    <p className="text-3xl font-bold text-white mt-1">{recordsLoading ? "--" : stat.value}</p>
+                    <p className="mt-2 text-sm text-slate-400">{stat.detail}</p>
                   </div>
                 );
               })}
-            </div>
+            </section>
+
+            <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Recent Activity</p>
+                    <h2 className="mt-2 text-xl font-semibold text-white">Latest quotation and shipment updates</h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate(requestsPath)}
+                    disabled={recordsLoading}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-950/60 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:border-orange-500/40 hover:text-white disabled:opacity-60"
+                  >
+                    <RefreshCw size={14} className={recordsLoading ? "animate-spin" : ""} />
+                    View all
+                  </button>
+                </div>
+                <div className="mt-5 space-y-3">
+                  {recordsLoading ? (
+                    <p className="text-sm text-slate-400">Loading your latest activity...</p>
+                  ) : dashboardMetrics.recentActivity.length ? (
+                    dashboardMetrics.recentActivity.map((entry) => (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        onClick={() => navigate(entry.to)}
+                        className="w-full rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-left transition hover:border-orange-500/30 hover:bg-slate-900"
+                      >
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-white">{entry.title}</p>
+                            <p className="mt-1 text-sm text-slate-400">{entry.subtitle}</p>
+                          </div>
+                          <p className="text-xs text-slate-500">{formatTimestamp(entry.updatedAt)}</p>
+                        </div>
+                        <div className="mt-3 inline-flex rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-xs font-semibold text-slate-200">
+                          {entry.status}
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/30 p-6 text-center">
+                      <p className="text-base font-semibold text-white">No shipment activity yet.</p>
+                      <p className="mt-2 text-sm text-slate-400">
+                        Start a quotation request to begin tracking your shipment activity here.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Quick Actions</p>
+                  <div className="mt-4 space-y-3">
+                    {quickActions.map((action) => (
+                      <button
+                        key={action.label}
+                        type="button"
+                        onClick={action.action}
+                        className="flex w-full items-start justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-left transition hover:border-orange-500/40 hover:bg-slate-900"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-white">{action.label}</p>
+                          <p className="mt-1 text-sm text-slate-400">{action.description}</p>
+                        </div>
+                        <ArrowRight size={16} className="mt-1 shrink-0 text-slate-500" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Track ID Lookup</p>
+                  <div className="mt-4 space-y-3">
+                    <div className="flex flex-col gap-3">
+                      <input
+                        value={trackingLookup}
+                        onChange={(event) => setTrackingLookup(event.target.value)}
+                        className="rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-500"
+                        placeholder="Enter track ID, order no, or quotation no"
+                      />
+                      {trackingLookup.trim() ? (
+                        trackingLookupResult?.type === "Missing" ? (
+                          <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/60 p-4 text-sm text-slate-400">
+                            No shipment or quotation matched that track ID yet.
+                          </div>
+                        ) : trackingLookupResult ? (
+                          <button
+                            type="button"
+                            onClick={() => navigate(trackingLookupResult.to)}
+                            className="w-full rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-left transition hover:border-orange-500/40 hover:bg-slate-900"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold text-white">{trackingLookupResult.title}</p>
+                                <p className="mt-1 text-sm text-slate-400">{trackingLookupResult.subtitle}</p>
+                              </div>
+                              <span className="rounded-full border border-slate-700 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-300">
+                                {trackingLookupResult.type}
+                              </span>
+                            </div>
+                            <div className="mt-3 inline-flex rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-xs font-semibold text-slate-200">
+                              {trackingLookupResult.status}
+                            </div>
+                          </button>
+                        ) : null
+                      ) : (
+                        <p className="text-sm text-slate-400">
+                          Track IDs are created automatically when you open a new quotation request.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+                  <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Journey Snapshot</p>
+                  <div className="mt-4 space-y-3">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                      <p className="text-sm font-semibold text-white">Request to quote</p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        Capture origin, destination, cargo, and dimensions to help the team price faster.
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                      <p className="text-sm font-semibold text-white">Review and respond</p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        Accept, negotiate, or revisit saved drafts directly from your quotations workspace.
+                      </p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4">
+                      <p className="text-sm font-semibold text-white">Track active delivery</p>
+                      <p className="mt-1 text-sm text-slate-400">
+                        Once a quotation is accepted, your shipment order appears under requests for ongoing visibility.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
         </main>
       </div>
@@ -742,6 +1107,12 @@ const CustomersDashboard = () => {
                 readOnly
                 className="rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-300 outline-none"
                 placeholder="Quotation Number"
+              />
+              <input
+                value={orderForm.trackingId}
+                readOnly
+                className="rounded-lg border border-slate-700 bg-slate-950/40 px-3 py-2 text-sm text-slate-300 outline-none"
+                placeholder="Tracking ID"
               />
               <input
                 value={orderForm.customerName}

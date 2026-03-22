@@ -25,22 +25,59 @@ import { useAuth } from "../Auth/AuthContext.jsx";
 
 // Central role-to-navigation map used to render a different sidebar for each user type.
 const roleLinks = {
-  opsuser: [
-    { label: "Dashboard", to: "/opsuser", icon: LayoutDashboard },
+  customer: [
+    { label: "Dashboard", to: "/customer", icon: LayoutDashboard },
     {
-      label: "My Quotations",
+      label: "My Shipments",
       icon: Package,
       children: [
         {
-          label: "My Shipments",
-          to: "/opsuser/shipments/quotations",
+          label: "My Quotations",
+          to: "/customer/shipments/quotations",
           icon: FileText,
         },
         {
           label: "Shipment Requests",
-          to: "/opsuser/shipments/requests",
+          to: "/customer/shipments/requests",
           icon: ClipboardList,
         },
+      ],
+    },
+    { label: "Tracking", to: "/customer/tracking", icon: MapPin },
+    { label: "Preferences", to: "/customer/settings", icon: Sliders },
+  ],
+  opsuser: [
+    { label: "Dashboard", to: "/opsuser", icon: LayoutDashboard },
+    {
+      label: "Operations",
+      icon: ClipboardList,
+      children: [
+        {
+          label: "Order Management",
+          icon: ClipboardList,
+          children: [
+            {
+              label: "Pending Quotations",
+              to: "/admin/pendingQuotation",
+              icon: ClipboardList,
+            },
+            
+
+            {
+              label: "Shipment Orders",
+              to: "/admin/orders",
+              icon: ClipboardList,
+            },
+            {
+              label: "Quotations History",
+              to: "/admin/quotationsHistory",
+              icon: ClipboardList,
+            },
+          ],
+        },
+        
+        
+
       ],
     },
     { label: "Tracking", to: "/opsuser/tracking", icon: MapPin },
@@ -48,9 +85,40 @@ const roleLinks = {
   ],
   opsmanager: [
     { label: "Dashboard", to: "/opsmanager", icon: LayoutDashboard },
-    { label: "Dispatch", to: "/opsmanager/dispatch", icon: Truck },
-    { label: "Warehouses", to: "/opsmanager/warehouses", icon: Warehouse },
-    { label: "Customers", to: "/opsmanager/customers", icon: Users },
+    {
+      label: "Operations Workspace",
+      icon: Truck,
+      children: [
+        { label: "Pending Quotations", to: "/admin/pendingQuotation", icon: Package },
+        { label: "Quotation History", to: "/admin/quotationsHistory", icon: ClipboardList },
+        { label: "Order Management", to: "/admin/orders", icon: Truck },
+      ],
+    },
+  ],
+  fleetmanager: [
+    { label: "Dashboard", to: "/fleet-manager", icon: LayoutDashboard },
+      {
+        label: "Fleet Oversight",
+        icon: Truck,
+        children: [
+          { label: "Truck Assignments", to: "/fleet-manager/assignments", icon: ClipboardList },
+          { label: "Vehicle Management", to: "/fleet-manager/vehicles", icon: Truck },
+          { label: "Compliance", to: "/fleet-manager/compliance", icon: ShieldCheck },
+          { label: "Reports", to: "/fleet-manager/reports", icon: BarChart3 },
+        ],
+      },
+  ],
+  auditor: [
+    { label: "Dashboard", to: "/auditor", icon: LayoutDashboard },
+    {
+      label: "Audit Workspace",
+      icon: ClipboardList,
+      children: [
+        { label: "Audit Trail", to: "/auditor/audit-trail", icon: ClipboardList },
+        { label: "Compliance Review", to: "/auditor/compliance-review", icon: ShieldCheck },
+        { label: "Audit Reports", to: "/auditor/reports", icon: FileText },
+      ],
+    },
   ],
   accounts: [
     { label: "Dashboard", to: "/accounts", icon: LayoutDashboard },

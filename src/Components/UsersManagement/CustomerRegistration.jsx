@@ -14,6 +14,7 @@ import { ArrowLeft, Building2, UserRound } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 import { app, secondaryAuth } from "../Auth/firebase";
+import { ROLE } from "../../utils/roles.js";
 
 const db = getFirestore(app);
 
@@ -240,7 +241,7 @@ const CustomerRegistration = () => {
 
       await setDoc(doc(db, "users", credential.user.uid), {
         email: loginEmail,
-        role: "opsuser",
+        role: ROLE.CUSTOMER,
         fullName: trimmedContactName,
         name: trimmedContactName,
         accountType,

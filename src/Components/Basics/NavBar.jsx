@@ -8,6 +8,7 @@ import {
   hasNotificationBeenRead,
   markNotificationsAsRead,
 } from "../Auth/notificationUtils.js";
+import { getDashboardPathByRole, getShipmentsPathByRole } from "../../utils/roles.js";
 
 const db = getFirestore(app);
 
@@ -52,10 +53,10 @@ const buildNotificationDestination = (notification, role) => {
     return `${adminPath}${params.toString() ? `?${params.toString()}` : ""}`;
   }
 
-  if (normalizedRole === "opsuser") {
+  if (normalizedRole === "customer" || normalizedRole === "opsuser") {
     const customerPath = normalizedType.includes("quotation")
-      ? "/opsuser/shipments/quotations"
-      : "/opsuser/shipments/requests";
+      ? getShipmentsPathByRole(normalizedRole, "quotations")
+      : getShipmentsPathByRole(normalizedRole, "requests");
     return `${customerPath}${params.toString() ? `?${params.toString()}` : ""}`;
   }
 
@@ -66,7 +67,7 @@ const buildNotificationDestination = (notification, role) => {
     return `${accountsPath}${params.toString() ? `?${params.toString()}` : ""}`;
   }
 
-  const fallbackPath = normalizedRole ? `/${normalizedRole}` : "/";
+  const fallbackPath = normalizedRole ? getDashboardPathByRole(normalizedRole) : "/";
   return `${fallbackPath}${params.toString() ? `?${params.toString()}` : ""}`;
 };
 

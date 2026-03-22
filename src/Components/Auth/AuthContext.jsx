@@ -15,105 +15,103 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { app, auth } from "./firebase";
+import { ROLE, isEmailVerificationRequired, normalizeRole } from "../../utils/roles.js";
 
 const AuthContext = createContext(null);
 const db = getFirestore(app);
-
-const ROLE = {
-  OPSUSER: "opsuser",
-  OPSMANAGER: "opsmanager",
-  ACCOUNTS: "accounts",
-  DRIVER: "driver",
-  ADMIN: "admin",
-};
-
-const normalizeRole = (value) => {
-  const role = (value || "").toString().trim().toLowerCase();
-  if (role === "opsuser" || role === "customer" || role === "customers") return ROLE.OPSUSER;
-  if (role === "opsmanager" || role === "staff") return ROLE.OPSMANAGER;
-  if (role === "accounts" || role === "account") return ROLE.ACCOUNTS;
-  if (role === "driver" || role === "drivers") return ROLE.DRIVER;
-  if (role === "admin") return ROLE.ADMIN;
-  return ROLE.OPSUSER;
-};
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showTimeoutWarning, setShowTimeoutWarning] = useState(false);
   const resetTimerRef = useRef(null);
-  const inactivityLimitMs = 15 * 60 * 1000;
+  const inactivityLimitMs = 5 * 60 * 1000;
   const warningOffsetMs = 1 * 60 * 1000;
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (!currentUser) {
-        setUser(null);
-        setShowTimeoutWarning(false);
-        setLoading(false);
+    let unsubscribe = () => {};
+    let isMounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        await signOut(auth);
+      } catch (error) {
+        console.error("Failed to clear persisted auth session on startup:", error);
+      }
+
+      if (!isMounted) {
         return;
       }
 
-      try {
-        const [profileSnap, tokenResult] = await Promise.all([
-          getDoc(doc(db, "users", currentUser.uid)),
-          getIdTokenResult(currentUser),
-        ]);
-
-        const profile = profileSnap.exists() ? profileSnap.data() : {};
-        const resolvedRole = normalizeRole(
-          profile.role || tokenResult?.claims?.role,
-        );
-
-        if (
-          !currentUser.emailVerified
-          && resolvedRole !== ROLE.ADMIN
-          && resolvedRole !== ROLE.ACCOUNTS
-          && resolvedRole !== ROLE.DRIVER
-        ) {
-          try {
-            await signOut(auth);
-          } catch (error) {
-            console.error("Failed to sign out unverified user:", error);
-          }
+      unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        if (!currentUser) {
           setUser(null);
           setShowTimeoutWarning(false);
           setLoading(false);
           return;
         }
 
-        setUser({
-          uid: currentUser.uid,
-          email: currentUser.email,
-          displayName:
-            profile.fullName ||
-            profile.name ||
-            currentUser.displayName ||
-            "",
-          photoURL: currentUser.photoURL || "",
-          emailVerified: currentUser.emailVerified,
-          role: resolvedRole,
-          roles: [resolvedRole],
-          profile,
-        });
-      } catch (error) {
-        console.error("Failed to resolve auth role:", error);
-        setUser({
-          uid: currentUser.uid,
-          email: currentUser.email,
-          displayName: currentUser.displayName || "",
-          photoURL: currentUser.photoURL || "",
-          emailVerified: currentUser.emailVerified,
-          role: ROLE.OPSUSER,
-          roles: [ROLE.OPSUSER],
-          profile: {},
-        });
-      } finally {
-        setLoading(false);
-      }
-    });
+        try {
+          const [profileSnap, tokenResult] = await Promise.all([
+            getDoc(doc(db, "users", currentUser.uid)),
+            getIdTokenResult(currentUser),
+          ]);
 
-    return () => unsubscribe();
+          const profile = profileSnap.exists() ? profileSnap.data() : {};
+          const resolvedRole = normalizeRole(
+            profile.role || tokenResult?.claims?.role,
+          );
+
+          if (!currentUser.emailVerified && isEmailVerificationRequired(resolvedRole)) {
+            try {
+              await signOut(auth);
+            } catch (error) {
+              console.error("Failed to sign out unverified user:", error);
+            }
+            setUser(null);
+            setShowTimeoutWarning(false);
+            setLoading(false);
+            return;
+          }
+
+          setUser({
+            uid: currentUser.uid,
+            email: currentUser.email,
+            displayName:
+              profile.fullName ||
+              profile.name ||
+              currentUser.displayName ||
+              "",
+            photoURL: currentUser.photoURL || "",
+            emailVerified: currentUser.emailVerified,
+            role: resolvedRole,
+            roles: [resolvedRole],
+            profile,
+          });
+        } catch (error) {
+          console.error("Failed to resolve auth role:", error);
+            setUser({
+              uid: currentUser.uid,
+              email: currentUser.email,
+              displayName: currentUser.displayName || "",
+              photoURL: currentUser.photoURL || "",
+              emailVerified: currentUser.emailVerified,
+              role: ROLE.CUSTOMER,
+              roles: [ROLE.CUSTOMER],
+              profile: {},
+            });
+        } finally {
+          setLoading(false);
+        }
+      });
+    };
+
+    initializeAuth();
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, []);
 
   useEffect(() => {
@@ -168,7 +166,7 @@ export const AuthProvider = ({ children }) => {
       user,
       loading,
       roles: ROLE,
-      signup: async (email, password, role = ROLE.OPSUSER, profile = {}) => {
+      signup: async (email, password, role = ROLE.CUSTOMER, profile = {}) => {
         const credential = await createUserWithEmailAndPassword(
           auth,
           email,
@@ -195,12 +193,7 @@ export const AuthProvider = ({ children }) => {
         const profile = profileSnap.exists() ? profileSnap.data() : {};
         const resolvedRole = normalizeRole(profile.role);
 
-        if (
-          !credential.user.emailVerified
-          && resolvedRole !== ROLE.ADMIN
-          && resolvedRole !== ROLE.ACCOUNTS
-          && resolvedRole !== ROLE.DRIVER
-        ) {
+        if (!credential.user.emailVerified && isEmailVerificationRequired(resolvedRole)) {
           await signOut(auth);
           throw new Error("Verify your email before logging in.");
         }
@@ -215,8 +208,11 @@ export const AuthProvider = ({ children }) => {
       hasRole: (role) => normalizeRole(user?.role) === normalizeRole(role),
       isAdmin: normalizeRole(user?.role) === ROLE.ADMIN,
       isOpsManager: normalizeRole(user?.role) === ROLE.OPSMANAGER,
+      isFleetManager: normalizeRole(user?.role) === ROLE.FLEETMANAGER,
+      isAuditor: normalizeRole(user?.role) === ROLE.AUDITOR,
       isAccounts: normalizeRole(user?.role) === ROLE.ACCOUNTS,
       isDriver: normalizeRole(user?.role) === ROLE.DRIVER,
+      isCustomer: normalizeRole(user?.role) === ROLE.CUSTOMER,
       isOpsUser: normalizeRole(user?.role) === ROLE.OPSUSER,
     }),
     [user, loading],

@@ -337,7 +337,7 @@ const DriverManagement = () => {
                   </button>
                 </div>
 
-                <div className="overflow-auto">
+                <div className="max-h-[65vh] overflow-auto">
                   <table className="w-full min-w-[980px] text-sm">
                     <thead>
                       <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">

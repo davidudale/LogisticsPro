@@ -3,14 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowBigLeftIcon } from "lucide-react";
 import { toast } from "react-toastify";
 import { useAuth } from "./AuthContext.jsx";
-
-const roleOptions = [
-  { value: "opsuser", label: "OPSUSER" },
-  { value: "opsmanager", label: "OPSMANAGER" },
-  { value: "accounts", label: "ACCOUNTS" },
-  { value: "driver", label: "Driver" },
-  { value: "admin", label: "ADMIN" },
-];
+import { ROLE, ROLE_OPTIONS } from "../../utils/roles.js";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -20,7 +13,7 @@ const Register = () => {
     email: "",
     password: "",
     confirmPassword: "",
-    role: "opsuser",
+    role: ROLE.CUSTOMER,
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -100,9 +93,9 @@ const Register = () => {
               onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))}
               className="w-full bg-slate-900/50 border border-slate-700 px-4 py-2 text-sm text-white focus:border-orange-500 rounded-sm"
             >
-              {roleOptions.map((role) => (
+              {ROLE_OPTIONS.map((role) => (
                 <option key={role.value} value={role.value}>
-                  {role.label}
+                  {role.label.toUpperCase()}
                 </option>
               ))}
             </select>

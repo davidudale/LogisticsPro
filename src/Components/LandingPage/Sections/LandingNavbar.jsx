@@ -1,15 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../Auth/AuthContext.jsx";
-
-// Keeps role-to-dashboard routing in one place for both desktop and mobile actions.
-const getDashboardPathByRole = (role) => {
-  if (role === "admin") return "/admin";
-  if (role === "opsmanager") return "/opsmanager";
-  if (role === "accounts") return "/accounts";
-  if (role === "driver") return "/driver";
-  return "/opsuser";
-};
+import { getDashboardPathByRole } from "../../../utils/roles.js";
 
 const LandingNavbar = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
