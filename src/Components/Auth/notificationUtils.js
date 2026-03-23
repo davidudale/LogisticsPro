@@ -4,8 +4,12 @@ import {
   collection,
   doc,
   getFirestore,
+  limit,
+  onSnapshot,
+  query,
   serverTimestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { app } from "./firebase";
 
@@ -69,4 +73,73 @@ export const markNotificationsAsRead = async (notificationIds, userUid) => {
         updatedAt: serverTimestamp(),
       })),
   );
+};
+
+const getNotificationTimestampValue = (value) => {
+  if (!value) return 0;
+  if (typeof value?.toDate === "function") return value.toDate().getTime();
+  if (typeof value?.seconds === "number") return value.seconds * 1000;
+  const parsedValue = new Date(value).getTime();
+  return Number.isNaN(parsedValue) ? 0 : parsedValue;
+};
+
+export const subscribeToTargetedNotifications = ({
+  user,
+  assignedTruckId = "",
+  onChange,
+  onError,
+  maxResults = 20,
+}) => {
+  const normalizedUid = normalizeValue(user?.uid);
+  const normalizedEmail = normalizeValue(user?.email).toLowerCase();
+  const normalizedRole = normalizeValue(user?.role).toLowerCase();
+  const normalizedTruckId = normalizeValue(assignedTruckId).toLowerCase();
+
+  const targets = [
+    normalizedUid ? { field: "targetUid", value: normalizedUid } : null,
+    normalizedEmail ? { field: "targetEmail", value: normalizedEmail } : null,
+    normalizedRole ? { field: "targetRole", value: normalizedRole } : null,
+    normalizedTruckId ? { field: "targetTruckId", value: normalizedTruckId } : null,
+  ].filter(Boolean);
+
+  if (!targets.length) {
+    onChange?.([]);
+    return () => {};
+  }
+
+  const notificationsMap = new Map();
+
+  const emit = () => {
+    const nextNotifications = [...notificationsMap.values()]
+      .sort(
+        (left, right) =>
+          getNotificationTimestampValue(right.createdAt || right.updatedAt)
+          - getNotificationTimestampValue(left.createdAt || left.updatedAt),
+      )
+      .slice(0, maxResults);
+
+    onChange?.(nextNotifications);
+  };
+
+  const unsubscribers = targets.map((target) =>
+    onSnapshot(
+      query(
+        collection(db, "notifications"),
+        where(target.field, "==", target.value),
+        limit(maxResults),
+      ),
+      (snapshot) => {
+        snapshot.docs.forEach((item) => {
+          notificationsMap.set(item.id, { id: item.id, ...item.data() });
+        });
+        emit();
+      },
+      (error) => {
+        onError?.(error);
+      },
+    ));
+
+  return () => {
+    unsubscribers.forEach((unsubscribe) => unsubscribe());
+  };
 };

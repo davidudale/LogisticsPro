@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
-import { collection, getFirestore, onSnapshot, orderBy, query } from "firebase/firestore";
 import { toast } from "react-toastify";
-import { app } from "./firebase";
 import { useAuth } from "./AuthContext.jsx";
-import { hasNotificationBeenRead } from "./notificationUtils.js";
-
-const db = getFirestore(app);
+import { hasNotificationBeenRead, subscribeToTargetedNotifications } from "./notificationUtils.js";
 
 const normalizeValue = (value) => (value || "").toString().trim().toLowerCase();
 
@@ -26,27 +22,13 @@ const NotificationListener = () => {
       return undefined;
     }
 
-    const notificationsQuery = query(collection(db, "notifications"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(
-      notificationsQuery,
-      (snapshot) => {
-        snapshot.docs.forEach((item) => {
-          const notification = { id: item.id, ...item.data() };
-          const targetUid = normalizeValue(notification.targetUid);
-          const targetEmail = normalizeValue(notification.targetEmail);
-          const targetRole = normalizeValue(notification.targetRole);
-          const targetTruckId = normalizeValue(notification.targetTruckId);
-
-          const isForCurrentUser = (
-            (targetUid && targetUid === normalizeValue(user.uid))
-            || (targetEmail && targetEmail === normalizeValue(user.email))
-            || (targetRole && targetRole === normalizeValue(user.role))
-            || (targetTruckId && assignedTruckId && targetTruckId === assignedTruckId)
-          );
-
+    const unsubscribe = subscribeToTargetedNotifications({
+      user,
+      assignedTruckId,
+      onChange: (notifications) => {
+        notifications.forEach((notification) => {
           if (
-            !isForCurrentUser
-            || hasNotificationBeenRead(notification, user.uid)
+            hasNotificationBeenRead(notification, user.uid)
             || shownNotificationsRef.current.has(notification.id)
           ) {
             return;
@@ -58,10 +40,10 @@ const NotificationListener = () => {
           );
         });
       },
-      (error) => {
+      onError: (error) => {
         console.error("Failed to subscribe to notifications:", error);
       },
-    );
+    });
 
     return () => unsubscribe();
   }, [assignedTruckId, user?.email, user?.role, user?.uid]);

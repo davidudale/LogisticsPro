@@ -52,7 +52,12 @@ const formatLocation = (location) => {
 
 const isAssignmentQueueStatus = (status) => {
   const normalized = (status || "").toString().trim().toLowerCase();
-  return ["shipment booked", "truck assigned - pending approval"].includes(normalized);
+  return [
+    "shipment booked",
+    "shipment- in transit",
+    "truck assigned - pending approval",
+    "truck assigned- pending approval",
+  ].includes(normalized);
 };
 
 const isAssignableVehicle = (vehicle) => {
@@ -329,43 +334,12 @@ const FleetTruckAssignments = () => {
                 <div>
                   <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Fleet Operations</p>
                   <h1 className="mt-2 text-3xl font-bold text-white">Truck assignment board</h1>
-                  <p className="mt-2 max-w-3xl text-sm text-slate-400">
-                    Match open shipment bookings with road-ready trucks and carry the linked driver and route details into dispatch.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-orange-500/20 bg-orange-500/10 px-4 py-3 text-sm text-orange-100">
-                  Truck assignments update the same shipment records used by dispatch, drivers, and accounts.
-                </div>
+                 
+              </div>
               </div>
             </header>
 
-            <section className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-                <div className="flex items-center gap-3">
-                  <ClipboardList className="text-orange-400" size={18} />
-                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Open Shipments</p>
-                </div>
-                <p className="mt-3 text-3xl font-bold text-white">{pendingBookings.length}</p>
-                <p className="mt-2 text-sm text-slate-400">Bookings currently marked as Shipment Booked or Truck Assigned - Pending Approval.</p>
-              </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-                <div className="flex items-center gap-3">
-                  <Truck className="text-emerald-400" size={18} />
-                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Road-Ready Trucks</p>
-                </div>
-                <p className="mt-3 text-3xl font-bold text-white">{assignableVehicles.length}</p>
-                <p className="mt-2 text-sm text-slate-400">Idle or available units ready to be attached to the next shipment.</p>
-              </div>
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="text-amber-300" size={18} />
-                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">Attention Needed</p>
-                </div>
-                <p className="mt-3 text-3xl font-bold text-white">{vehicleCountNeedingAttention}</p>
-                <p className="mt-2 text-sm text-slate-400">Vehicles blocked by maintenance or current transit status.</p>
-              </div>
-            </section>
-
+            
             <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
               <label className="flex items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/60 px-4 py-3">
                 <Search className="text-slate-500" size={18} />
@@ -387,109 +361,117 @@ const FleetTruckAssignments = () => {
               {loading ? (
                 <p className="mt-4 text-sm text-slate-500">Loading shipment bookings...</p>
               ) : filteredBookings.length === 0 ? (
-                <p className="mt-4 text-sm text-slate-500">No Shipment Booked or Truck Assigned - Pending Approval records matched your filters.</p>
+                <p className="mt-4 text-sm text-slate-500">No Shipment Booked, Shipment- In Transit, or Truck Assigned - Pending Approval records matched your filters.</p>
               ) : (
-                <div className="mt-4 grid gap-4">
-                  {filteredBookings.map((booking) => {
-                    const chosenTruckId = normalizeIdentifier(selectedTruckByBooking[booking.id] || booking.truckId);
-                    const selectedVehicle = vehicles.find((vehicle) => vehicle.id === chosenTruckId) || null;
-                    const linkedDriver = selectedVehicle ? resolveLinkedDriver(selectedVehicle) : null;
-                    const linkedRoute = linkedDriver ? resolveLinkedRoute(linkedDriver) : null;
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full min-w-[1380px] text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-left text-xs uppercase tracking-[0.12em] text-slate-400">
+                        <th className="px-3 py-3">Order</th>
+                        <th className="px-3 py-3">Customer</th>
+                        <th className="px-3 py-3">Shipment</th>
+                        <th className="px-3 py-3">Status</th>
+                        <th className="px-3 py-3">Delivery</th>
+                        <th className="px-3 py-3">Assign Truck</th>
+                        <th className="px-3 py-3">Selected Truck</th>
+                        <th className="px-3 py-3">Linked Driver</th>
+                        <th className="px-3 py-3">Route</th>
+                        <th className="px-3 py-3">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredBookings.map((booking) => {
+                        const chosenTruckId = normalizeIdentifier(selectedTruckByBooking[booking.id] || booking.truckId);
+                        const selectedVehicle = vehicles.find((vehicle) => vehicle.id === chosenTruckId) || null;
+                        const linkedDriver = selectedVehicle ? resolveLinkedDriver(selectedVehicle) : null;
+                        const linkedRoute = linkedDriver ? resolveLinkedRoute(linkedDriver) : null;
 
-                    return (
-                      <article key={booking.id} className="rounded-2xl border border-slate-800 bg-slate-950/60 p-5">
-                        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                          <div className="grid flex-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                            <div>
-                              <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Order</p>
-                              <p className="mt-2 text-base font-semibold text-white">{booking.orderNo || booking.id}</p>
-                              <p className="mt-1 text-sm text-slate-400">{booking.customerName || "Customer pending"}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Shipment</p>
-                              <p className="mt-2 text-sm font-semibold text-slate-200">{booking.cargo || "Cargo not specified"}</p>
-                              <p className="mt-1 text-sm text-slate-400">{booking.weight || "Weight not set"}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Status</p>
-                              <p className="mt-2 text-sm font-semibold text-amber-300">{booking.status}</p>
-                              <p className="mt-1 text-sm text-slate-400">Updated {formatTimestamp(booking)}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Delivery Address</p>
-                              <p className="mt-2 text-sm text-slate-300">{booking.deliveryAddress}</p>
-                            </div>
-                          </div>
-
-                          <div className="w-full max-w-xl rounded-2xl border border-slate-800 bg-slate-900/60 p-4">
-                            <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
-                              <div>
-                                <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Assign Truck</p>
-                                <select
-                                  value={chosenTruckId}
-                                  onChange={(event) =>
-                                    setSelectedTruckByBooking((current) => ({
-                                      ...current,
-                                      [booking.id]: event.target.value,
-                                    }))
-                                  }
-                                  className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none focus:border-orange-500"
-                                >
-                                  <option value="">Select road-ready truck</option>
-                                  {assignableVehicles.map((vehicle) => (
-                                    <option key={vehicle.firestoreId} value={vehicle.id}>
-                                      {vehicle.id} · {vehicle.type || "Truck"} · {vehicle.status || "Ready"}
-                                    </option>
-                                  ))}
-                                </select>
+                        return (
+                          <tr key={booking.id} className="border-b border-slate-800/80 align-top hover:bg-slate-900/20">
+                            <td className="px-3 py-4">
+                              <p className="font-semibold text-white">{booking.orderNo || booking.id}</p>
+                              <p className="mt-1 text-xs text-slate-500">{formatTimestamp(booking)}</p>
+                            </td>
+                            <td className="px-3 py-4 text-slate-300">
+                              {booking.customerName || "Customer pending"}
+                            </td>
+                            <td className="px-3 py-4">
+                              <p className="font-semibold text-slate-200">{booking.cargo || "Cargo not specified"}</p>
+                              <p className="mt-1 text-xs text-slate-500">{booking.weight || "Weight not set"}</p>
+                            </td>
+                            <td className="px-3 py-4">
+                              <span className="inline-flex rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-200">
+                                {booking.status}
+                              </span>
+                            </td>
+                            <td className="px-3 py-4 text-slate-300">
+                              <div className="max-w-[220px] whitespace-normal">
+                                {booking.deliveryAddress}
                               </div>
+                            </td>
+                            <td className="px-3 py-4">
+                              <select
+                                value={chosenTruckId}
+                                onChange={(event) =>
+                                  setSelectedTruckByBooking((current) => ({
+                                    ...current,
+                                    [booking.id]: event.target.value,
+                                  }))
+                                }
+                                className="w-full min-w-[220px] rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none focus:border-orange-500"
+                              >
+                                <option value="">Select road-ready truck</option>
+                                {assignableVehicles.map((vehicle) => (
+                                  <option key={vehicle.firestoreId} value={vehicle.id}>
+                                    {vehicle.id} · {vehicle.type || "Truck"} · {vehicle.status || "Ready"}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-3 py-4">
+                              <p className="font-semibold text-white">{selectedVehicle?.id || booking.truckId || "Not selected"}</p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {selectedVehicle
+                                  ? `${selectedVehicle.type || "Truck"} · ${selectedVehicle.location || "No location"}`
+                                  : "Choose a truck to review readiness."}
+                              </p>
+                            </td>
+                            <td className="px-3 py-4">
+                              <div className="flex items-start gap-2">
+                                <UserRound size={14} className="mt-0.5 shrink-0 text-slate-500" />
+                                <div>
+                                  <p className="font-semibold text-white">{linkedDriver?.fullName || booking.assignedDriverName || "No linked driver"}</p>
+                                  <p className="mt-1 text-xs text-slate-500">
+                                    {linkedDriver
+                                      ? `${linkedDriver.assignmentStatus}${linkedDriver.territory ? ` · ${linkedDriver.territory}` : ""}`
+                                      : "Driver stays blank until this truck is linked to one."}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-3 py-4">
+                              <p className="font-semibold text-white">{linkedRoute?.routeName || booking.assignedRouteName || "No linked route"}</p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                {linkedRoute
+                                  ? [linkedRoute.distance, linkedRoute.estimatedTime].filter(Boolean).join(" · ") || "Route attached"
+                                  : "Route will populate when the linked driver already has one."}
+                              </p>
+                            </td>
+                            <td className="px-3 py-4">
                               <button
                                 type="button"
                                 onClick={() => assignTruck(booking)}
                                 disabled={!chosenTruckId || busyBookingId === booking.id}
-                                className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                className="inline-flex w-full items-center justify-center rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
                               >
                                 {busyBookingId === booking.id ? "Saving..." : booking.truckId ? "Reassign Truck" : "Assign Truck"}
                               </button>
-                            </div>
-
-                            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                                <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Truck</p>
-                                <p className="mt-2 text-sm font-semibold text-white">{selectedVehicle?.id || booking.truckId || "Not selected"}</p>
-                                <p className="mt-1 text-xs text-slate-400">
-                                  {selectedVehicle
-                                    ? `${selectedVehicle.type || "Truck"} · ${selectedVehicle.location || "No location"}`
-                                    : "Choose a truck to review readiness."}
-                                </p>
-                              </div>
-                              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                                <div className="flex items-center gap-2">
-                                  <UserRound size={14} className="text-slate-500" />
-                                  <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Linked Driver</p>
-                                </div>
-                                <p className="mt-2 text-sm font-semibold text-white">{linkedDriver?.fullName || booking.assignedDriverName || "No linked driver"}</p>
-                                <p className="mt-1 text-xs text-slate-400">
-                                  {linkedDriver
-                                    ? `${linkedDriver.assignmentStatus}${linkedDriver.territory ? ` · ${linkedDriver.territory}` : ""}`
-                                    : "Driver will remain blank until this truck is linked to one."}
-                                </p>
-                              </div>
-                              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                                <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Route</p>
-                                <p className="mt-2 text-sm font-semibold text-white">{linkedRoute?.routeName || booking.assignedRouteName || "No linked route"}</p>
-                                <p className="mt-1 text-xs text-slate-400">
-                                  {linkedRoute
-                                    ? [linkedRoute.distance, linkedRoute.estimatedTime].filter(Boolean).join(" · ") || "Route attached"
-                                    : "Route will populate when the linked driver already has one."}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </article>
-                    );
-                  })}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </section>

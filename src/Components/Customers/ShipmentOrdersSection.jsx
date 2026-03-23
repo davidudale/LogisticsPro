@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Box, CreditCard, Printer } from "lucide-react";
+import { ArrowRight, Box, CreditCard, Printer, ShieldCheck } from "lucide-react";
 import { useOutletContext } from "react-router-dom";
 import { toast } from "react-toastify";
 import InvoicePreviewModal from "../Shared/InvoicePreviewModal.jsx";
@@ -129,8 +129,11 @@ const ShipmentOrdersSection = () => {
               </tr>
             </thead>
             <tbody>
-              {sortedOrders.map((order) => (
-                <tr key={order.id} className="border-b border-slate-800/80 align-top hover:bg-slate-900/30">
+              {sortedOrders.map((order) => {
+                const isPaid = (order.paymentStatus || "").toString().trim().toLowerCase() === "paid";
+
+                return (
+                  <tr key={order.id} className="border-b border-slate-800/80 align-top hover:bg-slate-900/30">
                   <td className="px-3 py-4 font-semibold text-white">{order.orderNo || "Order"}</td>
                   <td className="px-3 py-4 text-slate-300">{formatTimestamp(order)}</td>
                   <td className="px-3 py-4">
@@ -168,7 +171,7 @@ const ShipmentOrdersSection = () => {
                   </td>
                   <td className="px-3 py-4 text-slate-300">{order.eta || "Pending Confirmation"}</td>
                   <td className="px-3 py-4">
-                    {order.status === "Shipment Booked" ? (
+                    {order.status === "Shipment Booked" || !isPaid ? (
                       <div className="flex flex-col gap-2">
                         <button
                           type="button"
@@ -178,21 +181,24 @@ const ShipmentOrdersSection = () => {
                           <Printer size={14} />
                           Print
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => openPaymentModal(order)}
-                          className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/20"
-                        >
-                          <CreditCard size={14} />
-                          Pay Now
-                        </button>
+                        {!isPaid ? (
+                          <button
+                            type="button"
+                            onClick={() => openPaymentModal(order)}
+                            className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs font-semibold text-emerald-200 hover:bg-emerald-500/20"
+                          >
+                            <CreditCard size={14} />
+                            Pay Now
+                          </button>
+                        ) : null}
                       </div>
                     ) : (
                       <span className="text-xs text-slate-500">Not available</span>
                     )}
                   </td>
-                </tr>
-              ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -207,7 +213,7 @@ const ShipmentOrdersSection = () => {
               <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Payment Submission</p>
               <h3 className="mt-2 text-2xl font-semibold text-white">Pay {paymentOrder.orderNo || "Shipment Order"}</h3>
               <p className="mt-2 text-sm text-slate-400">
-                Submit your payment details here so the accounts team can confirm the settlement.
+                Review the shipment billing details below before continuing to secure checkout.
               </p>
             </div>
             <button
@@ -219,25 +225,59 @@ const ShipmentOrdersSection = () => {
             </button>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Invoice Total</p>
-            <p className="mt-2 text-2xl font-bold text-white">
-              NGN {Number(paymentOrder.quoteTotal || 0).toLocaleString()}
-            </p>
-          </div>
-
           <div className="mt-6 space-y-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300">
-              <p className="font-semibold text-white">Secure checkout</p>
-              <p className="mt-2">
-                Clicking continue opens Paystack checkout in a secure popup. Your order is only marked
-                as paid after our backend verifies the Paystack reference and updates Firestore.
-              </p>
+            <div className="rounded-3xl border border-emerald-500/20 bg-gradient-to-br from-emerald-500/12 via-slate-900/90 to-slate-950 p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-[0.16em] text-emerald-300">Amount Due</p>
+                  <p className="mt-2 text-3xl font-bold text-white">
+                    NGN {Number(paymentOrder.quoteTotal || 0).toLocaleString()}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-300">
+                    This checkout covers the current invoice total for the shipment below.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-emerald-200">
+                  <CreditCard size={20} />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300">
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Billing Email</p>
+                <p className="mt-2 font-semibold text-white">{user?.email || paymentOrder.customerEmail || "Not available"}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300">
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Payment Status</p>
+                <p className="mt-2 font-semibold text-white">{paymentOrder.paymentStatus || "Unpaid"}</p>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300">
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Cargo</p>
+                <p className="mt-2 font-semibold text-white">{paymentOrder.cargo || "Shipment cargo"}</p>
+                <p className="mt-1 text-xs text-slate-500">{paymentOrder.weight || "Weight not provided"}</p>
+              </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300">
+                <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Destination</p>
+                <p className="mt-2 font-semibold text-white">{paymentOrder.deliveryAddress || formatLocation(paymentOrder.destination) || "Not available"}</p>
+              </div>
             </div>
 
             <div className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 text-sm text-slate-300">
-              <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Billing Email</p>
-              <p className="mt-2 font-semibold text-white">{user?.email || paymentOrder.customerEmail || "Not available"}</p>
+              <div className="flex items-center gap-2">
+                <ShieldCheck size={16} className="text-emerald-300" />
+                <p className="font-semibold text-white">Secure checkout</p>
+              </div>
+              <p className="mt-2">
+                Continuing opens Paystack in a secure popup. Your shipment is only marked as paid after
+                the payment reference is verified and synced back to LogisticsPro.
+              </p>
+              <div className="mt-3 rounded-2xl border border-slate-800 bg-slate-950/60 p-3 text-xs text-slate-400">
+                Use the same email address shown above to keep your payment confirmation aligned with this shipment.
+              </div>
             </div>
 
             <div className="flex items-center justify-end gap-3">
@@ -254,7 +294,12 @@ const ShipmentOrdersSection = () => {
                 disabled={savingPayment}
                 className="rounded-xl border border-emerald-500/40 bg-emerald-500/15 px-4 py-3 text-sm font-semibold text-emerald-100 transition hover:border-emerald-400 hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {savingPayment ? "Processing..." : "Continue to Paystack"}
+                {savingPayment ? "Processing..." : (
+                  <span className="inline-flex items-center gap-2">
+                    Continue to Paystack
+                    <ArrowRight size={16} />
+                  </span>
+                )}
               </button>
             </div>
           </div>

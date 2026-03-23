@@ -11,15 +11,15 @@ const loadPaystackInline = () => {
     return Promise.reject(new Error("Paystack can only be loaded in the browser."));
   }
 
-  if (window.Paystack) {
-    return Promise.resolve(window.Paystack);
+  if (window.PaystackPop) {
+    return Promise.resolve(window.PaystackPop);
   }
 
   if (!paystackScriptPromise) {
     paystackScriptPromise = new Promise((resolve, reject) => {
       const existingScript = document.querySelector(`script[src="${PAYSTACK_SCRIPT_URL}"]`);
       if (existingScript) {
-        existingScript.addEventListener("load", () => resolve(window.Paystack));
+        existingScript.addEventListener("load", () => resolve(window.PaystackPop));
         existingScript.addEventListener("error", () => reject(new Error("Failed to load Paystack checkout.")));
         return;
       }
@@ -27,7 +27,7 @@ const loadPaystackInline = () => {
       const script = document.createElement("script");
       script.src = PAYSTACK_SCRIPT_URL;
       script.async = true;
-      script.onload = () => resolve(window.Paystack);
+      script.onload = () => resolve(window.PaystackPop);
       script.onerror = () => reject(new Error("Failed to load Paystack checkout."));
       document.body.appendChild(script);
     });
@@ -57,9 +57,9 @@ export const startPaystackOrderPayment = async ({
     throw new Error("A customer email is required to start Paystack checkout.");
   }
 
-  const Paystack = await loadPaystackInline();
+  const PaystackPop = await loadPaystackInline();
   const verifyPayment = httpsCallable(functions, "verifyPaystackPayment");
-  const popup = new Paystack();
+  const popup = new PaystackPop();
   const reference = buildPaymentReference(order);
   const amountInKobo = Math.round(Number(order?.quoteTotal || 0) * 100);
 

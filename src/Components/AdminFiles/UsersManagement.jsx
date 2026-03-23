@@ -378,11 +378,7 @@ const UsersManagement = () => {
                   <div>
                     <p className="text-xs uppercase tracking-[0.24em] text-slate-500">System Setup</p>
                     <h1 className="mt-2 text-3xl font-bold text-white">Users Management</h1>
-                    <p className="mt-2 max-w-3xl text-sm text-slate-400">
-                      Manage internal users and their Firebase-backed roles from one place.
-                      New users are created in Firebase Authentication and mirrored into the
-                      Firestore <span className="font-semibold text-slate-200">users</span> collection.
-                    </p>
+                    
                   </div>
                 </div>
 
@@ -416,12 +412,7 @@ const UsersManagement = () => {
 
             <section className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-white">User Directory</h2>
-                  <p className="mt-1 text-sm text-slate-400">
-                    Roles are read from Firestore, which is the same source used by your current auth flow.
-                  </p>
-                </div>
+                
 
                 <div className="flex flex-col gap-3 md:flex-row md:items-center">
                   <label className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2 text-slate-400">
@@ -554,8 +545,7 @@ const UsersManagement = () => {
                 <p className="text-xs uppercase tracking-[0.2em] text-slate-500">New Internal User</p>
                 <h2 className="mt-2 text-2xl font-semibold text-white">Create user account</h2>
                 <p className="mt-2 text-sm text-slate-400">
-                  This creates a Firebase Authentication account and its matching Firestore
-                  profile record.
+                  This creates account.
                 </p>
               </div>
               <button

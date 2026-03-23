@@ -1,16 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Bell, LogOut, Menu, X } from "lucide-react";
-import { collection, getFirestore, onSnapshot, orderBy, query } from "firebase/firestore";
-import { app } from "../Auth/firebase.js";
 import { useAuth } from "../Auth/AuthContext.jsx";
 import {
   hasNotificationBeenRead,
   markNotificationsAsRead,
+  subscribeToTargetedNotifications,
 } from "../Auth/notificationUtils.js";
 import { getDashboardPathByRole, getShipmentsPathByRole } from "../../utils/roles.js";
-
-const db = getFirestore(app);
 
 const normalizeValue = (value) => (value || "").toString().trim().toLowerCase();
 
@@ -100,38 +97,17 @@ const NavBar = ({ title = "Dashboard", onToggleSidebar }) => {
       return undefined;
     }
 
-    const notificationsQuery = query(collection(db, "notifications"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(
-      notificationsQuery,
-      (snapshot) => {
-        const nextNotifications = snapshot.docs
-          .map((item) => ({ id: item.id, ...item.data() }))
-          .filter((notification) => {
-            const targetUid = normalizeValue(notification.targetUid);
-            const targetEmail = normalizeValue(notification.targetEmail);
-            const targetRole = normalizeValue(notification.targetRole);
-            const targetTruckId = normalizeValue(notification.targetTruckId);
-
-            return (
-              (targetUid && targetUid === normalizeValue(user.uid))
-              || (targetEmail && targetEmail === normalizeValue(user.email))
-              || (targetRole && targetRole === normalizeValue(user.role))
-              || (targetTruckId && assignedTruckId && targetTruckId === assignedTruckId)
-            );
-          })
-          .sort(
-            (left, right) =>
-              getTimestampValue(right.createdAt || right.updatedAt)
-              - getTimestampValue(left.createdAt || left.updatedAt),
-          )
-          .slice(0, 8);
-
+    const unsubscribe = subscribeToTargetedNotifications({
+      user,
+      assignedTruckId,
+      maxResults: 8,
+      onChange: (nextNotifications) => {
         setNotifications(nextNotifications);
       },
-      (error) => {
+      onError: (error) => {
         console.error("Failed to load navbar notifications:", error);
       },
-    );
+    });
 
     return () => unsubscribe();
   }, [assignedTruckId, user?.email, user?.role, user?.uid]);
