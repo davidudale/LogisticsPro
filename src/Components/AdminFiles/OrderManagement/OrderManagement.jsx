@@ -37,6 +37,11 @@ const formatLocation = (location) => {
   return [location.address, location.lga, location.state, location.country].filter(Boolean).join(", ");
 };
 
+const formatStateName = (location) => {
+  if (!location || typeof location !== "object") return "Not available";
+  return location.state || "Not available";
+};
+
 const formatEtaFromMinutes = (durationMinutes) => {
   if (!durationMinutes || durationMinutes <= 0) {
     return "";
@@ -396,6 +401,14 @@ const OrderManagement = () => {
       setOrders(orderSnap.docs.map(mapOrderRecord));
       setSupportTickets(supportSnap.docs.map(mapSupportRecord));
     } catch (loadError) {
+      console.error("[Firestore][OrderManagement] Failed loading collections", {
+        collections: [
+          COLLECTIONS.customers,
+          COLLECTIONS.orders,
+          COLLECTIONS.support,
+        ],
+        error: loadError,
+      });
       const message = loadError?.message || "Failed to fetch records.";
       setError(message);
       toast.error(message);
@@ -414,6 +427,10 @@ const OrderManagement = () => {
         setLoading(false);
       },
       (snapshotError) => {
+        console.error("[Firestore][OrderManagement] Failed watching collection", {
+          collection: COLLECTIONS.customers,
+          error: snapshotError,
+        });
         const message = snapshotError?.message || "Failed to watch shipment orders.";
         setError(message);
         toast.error(message);
@@ -426,6 +443,10 @@ const OrderManagement = () => {
         setOrders(snapshot.docs.map(mapOrderRecord));
       },
       (snapshotError) => {
+        console.error("[Firestore][OrderManagement] Failed watching collection", {
+          collection: COLLECTIONS.orders,
+          error: snapshotError,
+        });
         toast.error(snapshotError?.message || "Failed to watch tracking updates.");
       },
     );
@@ -436,6 +457,10 @@ const OrderManagement = () => {
         setSupportTickets(snapshot.docs.map(mapSupportRecord));
       },
       (snapshotError) => {
+        console.error("[Firestore][OrderManagement] Failed watching collection", {
+          collection: COLLECTIONS.support,
+          error: snapshotError,
+        });
         toast.error(snapshotError?.message || "Failed to watch support updates.");
       },
     );
@@ -468,6 +493,10 @@ const OrderManagement = () => {
         setFleetVehicles(nextFleetVehicles);
       },
       (snapshotError) => {
+        console.error("[Firestore][OrderManagement] Failed watching collection", {
+          collection: COLLECTIONS.fleetVehicles,
+          error: snapshotError,
+        });
         toast.error(snapshotError?.message || "Failed to watch fleet vehicles.");
       },
     );
@@ -478,6 +507,10 @@ const OrderManagement = () => {
         setFleetDrivers(snapshot.docs.map(mapDriverRecord).filter((driver) => driver.fullName));
       },
       (snapshotError) => {
+        console.error("[Firestore][OrderManagement] Failed watching collection", {
+          collection: COLLECTIONS.fleetDrivers,
+          error: snapshotError,
+        });
         toast.error(snapshotError?.message || "Failed to watch fleet drivers.");
       },
     );
@@ -488,6 +521,10 @@ const OrderManagement = () => {
         setFleetRoutes(snapshot.docs.map(mapRouteRecord).filter((route) => route.routeName));
       },
       (snapshotError) => {
+        console.error("[Firestore][OrderManagement] Failed watching collection", {
+          collection: COLLECTIONS.fleetRoutes,
+          error: snapshotError,
+        });
         toast.error(snapshotError?.message || "Failed to watch fleet routes.");
       },
     );
@@ -915,7 +952,7 @@ const OrderManagement = () => {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                       <th className="px-3 py-2">Order No</th>
-                      <th className="px-3 py-2">Timestamp</th>
+                      <th className="px-3 py-2">Last Updated</th>
                       <th className="px-3 py-2">Customer</th>
                       <th className="px-3 py-2">Cargo</th>
                       <th className="px-3 py-2">Weight</th>
@@ -946,8 +983,8 @@ const OrderManagement = () => {
                             <td className="px-3 py-3 text-slate-300">{row.customerName}</td>
                             <td className="px-3 py-3 text-slate-300">{row.cargo || "Not specified"}</td>
                             <td className="px-3 py-3 text-slate-400">{row.weight || "Not specified"}</td>
-                            <td className="px-3 py-3 text-slate-400">{formatLocation(row.origin)}</td>
-                            <td className="px-3 py-3 text-slate-400">{formatLocation(row.destination)}</td>
+                            <td className="px-3 py-3 text-slate-400">{formatStateName(row.origin)}</td>
+                            <td className="px-3 py-3 text-slate-400">{formatStateName(row.destination)}</td>
                             <td className="px-3 py-3 text-slate-300">{row.status}</td>
                             <td className="px-3 py-3">
                               <div className="flex items-center gap-2 flex-wrap">
@@ -1021,7 +1058,7 @@ const OrderManagement = () => {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                       <th className="px-3 py-2">Order No</th>
-                      <th className="px-3 py-2">Timestamp</th>
+                      <th className="px-3 py-2">Last Updated</th>
                       <th className="px-3 py-2">Truck ID</th>
                       <th className="px-3 py-2">Current Location</th>
                       <th className="px-3 py-2">ETA</th>
@@ -1098,7 +1135,7 @@ const OrderManagement = () => {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                       <th className="px-3 py-2">Delivery No</th>
-                      <th className="px-3 py-2">Timestamp</th>
+                      <th className="px-3 py-2">Last Updated</th>
                       <th className="px-3 py-2">Order No</th>
                       <th className="px-3 py-2">Confirmation</th>
                       <th className="px-3 py-2">Feedback</th>

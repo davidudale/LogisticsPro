@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowBigLeftIcon } from "lucide-react";
 import { toast } from "react-toastify";
 import { useAuth } from "./AuthContext.jsx";
-import { ROLE, ROLE_OPTIONS } from "../../utils/roles.js";
+import { ROLE } from "../../utils/roles.js";
 
 const Register = () => {
   const navigate = useNavigate();
@@ -86,19 +86,14 @@ const Register = () => {
         <form className="space-y-2" onSubmit={onSubmit}>
           <div>
             <label className="text-sm font-bold text-slate-400 uppercase tracking-widest block mb-2">
-              Assign Role
+              Account Type
             </label>
-            <select
-              value={form.role}
-              onChange={(e) => setForm((prev) => ({ ...prev, role: e.target.value }))}
-              className="w-full bg-slate-900/50 border border-slate-700 px-4 py-2 text-sm text-white focus:border-orange-500 rounded-sm"
-            >
-              {ROLE_OPTIONS.map((role) => (
-                <option key={role.value} value={role.value}>
-                  {role.label.toUpperCase()}
-                </option>
-              ))}
-            </select>
+            <div className="w-full rounded-sm border border-slate-700 bg-slate-900/50 px-4 py-2 text-sm text-white">
+              CUSTOMER
+            </div>
+            <p className="mt-2 text-xs text-slate-400">
+              Staff and admin accounts are created from the internal users management workspace.
+            </p>
           </div>
           <div>
             <label className="text-sm font-bold text-slate-400 uppercase tracking-widest block mb-2">

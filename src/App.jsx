@@ -7,7 +7,6 @@ import Homepage from "./Components/LandingPage/Homepage.jsx";
 import Login from "./Components/Auth/Login.jsx";
 import Register from "./Components/Auth/Register.jsx";
 import ProtectedRoute from "./Components/Auth/ProtectedRoute.jsx";
-import NotificationListener from "./Components/Auth/NotificationListener.jsx";
 import CustomersDashboard from "./Components/Dashboards/CustomersDashboard.jsx";
 import Drivers from "./Components/Dashboards/Drivers.jsx";
 import DriverAssignments from "./Components/Drivers/DriverAssignments.jsx";
@@ -50,7 +49,6 @@ import AuditReports from "./Components/Auditor/AuditReports.jsx";
 const App = () => {
   return (
     <>
-      <NotificationListener />
       <Routes>
         <Route path="/" element={<Homepage />} />
         <Route path="/login" element={<Login />} />

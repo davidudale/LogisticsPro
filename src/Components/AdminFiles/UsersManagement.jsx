@@ -160,6 +160,10 @@ const UsersManagement = () => {
         setLoading(false);
       },
       (error) => {
+        console.error("[Firestore][UsersManagement] Failed watching collection", {
+          collection: USERS_COLLECTION,
+          error,
+        });
         setLoading(false);
         toast.error(error?.message || "Failed to load users.");
       },

@@ -16,4 +16,4 @@ const secondaryApp = getApps().find(({ name }) => name === "secondary-auth")
 const auth = getAuth(app);
 const secondaryAuth = getAuth(secondaryApp);
 
-export { app, auth, secondaryAuth };
+export { app, auth, secondaryApp, secondaryAuth };

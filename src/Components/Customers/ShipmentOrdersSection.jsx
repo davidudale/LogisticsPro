@@ -16,6 +16,7 @@ const ShipmentOrdersSection = () => {
     formatLocation,
     formatDimensions,
   } = useOutletContext();
+  const formatStateName = (location) => location?.state || "Not available";
   const getTimestampValue = (value) => {
     if (!value) return 0;
     if (typeof value?.toDate === "function") return value.toDate().getTime();
@@ -115,7 +116,7 @@ const ShipmentOrdersSection = () => {
             <thead className="bg-slate-900/80">
               <tr className="border-b border-slate-800 text-xs uppercase tracking-[0.12em] text-slate-400">
                 <th className="px-3 py-3">Order No</th>
-                <th className="px-3 py-3">Timestamp</th>
+                <th className="px-3 py-3">Last Updated</th>
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3">Customer</th>
                 <th className="px-3 py-3">Origin</th>
@@ -144,8 +145,8 @@ const ShipmentOrdersSection = () => {
                   <td className="px-3 py-4 text-slate-300">
                     {order.customerName || user?.displayName || "Customer"}
                   </td>
-                  <td className="px-3 py-4 text-slate-300">{formatLocation(order.origin)}</td>
-                  <td className="px-3 py-4 text-slate-300">{formatLocation(order.destination)}</td>
+                  <td className="px-3 py-4 text-slate-300">{formatStateName(order.origin)}</td>
+                  <td className="px-3 py-4 text-slate-300">{formatStateName(order.destination)}</td>
                   <td className="px-3 py-4 text-slate-300">{order.cargo || "Not specified"}</td>
                   <td className="px-3 py-4 text-slate-300">{order.weight || "Not specified"}</td>
                   <td className="px-3 py-4 text-slate-300">

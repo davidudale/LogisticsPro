@@ -14,12 +14,12 @@ service cloud.firestore {
 
     function currentUserRole() {
       return signedIn() && userDoc() != null && userDoc().data.role is string
-        ? lower(userDoc().data.role)
+        ? userDoc().data.role.lower()
         : "";
     }
 
     function hasRole(role) {
-      return currentUserRole() == lower(role);
+      return currentUserRole() == role.lower();
     }
 
     function hasAnyRole(roles) {
@@ -77,17 +77,51 @@ service cloud.firestore {
       return signedIn() && (isAdmin() || isOpsManager());
     }
 
+    function selfUserDoc(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function selfUserCreateAllowed(userId) {
+      return selfUserDoc(userId)
+        && request.resource.data.role is string
+        && request.resource.data.role == "customer"
+        && request.resource.data.email is string
+        && request.auth.token.email is string
+        && request.resource.data.email == request.auth.token.email;
+    }
+
+    function selfUserUpdateAllowed(userId) {
+      return selfUserDoc(userId)
+        && request.resource.data.role == resource.data.role
+        && (
+          !(resource.data.accountStatus is string)
+          || request.resource.data.accountStatus == resource.data.accountStatus
+        )
+        && (
+          !(resource.data.accountType is string)
+          || request.resource.data.accountType == resource.data.accountType
+        )
+        && (
+          !(resource.data.emailVerified is bool)
+          || request.resource.data.emailVerified == resource.data.emailVerified
+        )
+        && (
+          !(resource.data.email is string)
+          || request.resource.data.email == resource.data.email
+        );
+    }
+
     function requestEmail() {
       return signedIn() && request.auth.token.email is string
-        ? lower(request.auth.token.email)
+        ? request.auth.token.email.lower()
         : "";
     }
 
     function resourceEmail(resourceData) {
       return resourceData.customerEmail is string
-        ? lower(resourceData.customerEmail)
+        ? resourceData.customerEmail.lower()
         : resourceData.email is string
-          ? lower(resourceData.email)
+          ? resourceData.email.lower()
           : "";
     }
 
@@ -111,48 +145,44 @@ service cloud.firestore {
 
     function driverTruckId() {
       return signedIn() && userDoc() != null && userDoc().data.assignedTruckId is string
-        ? lower(userDoc().data.assignedTruckId)
+        ? userDoc().data.assignedTruckId.lower()
         : signedIn() && userDoc() != null && userDoc().data.truckId is string
-          ? lower(userDoc().data.truckId)
+          ? userDoc().data.truckId.lower()
           : signedIn() && userDoc() != null && userDoc().data.vehicleId is string
-            ? lower(userDoc().data.vehicleId)
+            ? userDoc().data.vehicleId.lower()
             : "";
     }
 
     function notificationTargetsCurrentUser(resourceData) {
       return signedIn() && (
         (resourceData.targetUid is string && resourceData.targetUid == request.auth.uid)
-        || (resourceData.targetEmail is string && lower(resourceData.targetEmail) == requestEmail())
-        || (resourceData.targetRole is string && lower(resourceData.targetRole) == currentUserRole())
+        || (resourceData.targetEmail is string && resourceData.targetEmail.lower() == requestEmail())
+        || (resourceData.targetRole is string && resourceData.targetRole.lower() == currentUserRole())
         || (
           isDriver()
           && driverTruckId() != ""
           && resourceData.targetTruckId is string
-          && lower(resourceData.targetTruckId) == driverTruckId()
+          && resourceData.targetTruckId.lower() == driverTruckId()
         )
       );
     }
 
     match /users/{userId} {
-      allow read: if signedIn() && (request.auth.uid == userId || canManageUsers());
-      allow create: if signedIn() && (request.auth.uid == userId || canManageUsers());
-      allow update: if signedIn() && (request.auth.uid == userId || canManageUsers());
+      allow read: if signedIn();
+      allow create: if canManageUsers() || selfUserCreateAllowed(userId);
+      allow update: if canManageUsers() || selfUserUpdateAllowed(userId);
       allow delete: if isAdmin();
     }
 
     match /customers/{customerId} {
-      allow read: if signedIn() && (request.auth.uid == customerId || isAdmin() || isOpsStaff());
+      allow read: if signedIn();
       allow create: if signedIn() && (request.auth.uid == customerId || isAdmin() || isOpsStaff());
       allow update: if signedIn() && (request.auth.uid == customerId || isAdmin() || isOpsStaff());
       allow delete: if isAdmin();
     }
 
     match /Quotations/{quotationId} {
-      allow read: if signedIn() && (
-        isStaff()
-        || isDriver()
-        || ownsResource(resource.data)
-      );
+      allow read: if signedIn();
       allow create: if signedIn();
       allow update: if signedIn() && (
         isAdmin()
@@ -163,16 +193,7 @@ service cloud.firestore {
     }
 
     match /customer_order/{orderId} {
-      allow read: if signedIn() && (
-        isStaff()
-        || (
-          isDriver()
-          && driverTruckId() != ""
-          && resource.data.truckId is string
-          && lower(resource.data.truckId) == driverTruckId()
-        )
-        || ownsResource(resource.data)
-      );
+      allow read: if signedIn();
       allow create: if signedIn() && (
         isAdmin()
         || isOpsStaff()
@@ -189,38 +210,45 @@ service cloud.firestore {
     }
 
     match /order_shipments/{shipmentId} {
-      allow read, create, update, delete: if signedIn() && (isAdmin() || isOpsStaff() || isFleetManager());
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn() && (isAdmin() || isOpsStaff() || isFleetManager());
     }
 
     match /order_issues/{issueId} {
-      allow read, create, update, delete: if signedIn() && (isAdmin() || isOpsStaff());
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn() && (isAdmin() || isOpsStaff());
     }
 
     match /customer_orders/{orderId} {
-      allow read, create, update, delete: if signedIn() && canManageUsers();
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn() && canManageUsers();
     }
 
     match /customer_support/{supportId} {
-      allow read, create, update, delete: if signedIn() && canManageUsers();
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn() && canManageUsers();
     }
 
     match /fleet_vehicles/{vehicleId} {
-      allow read: if signedIn() && (isStaff() || isDriver());
+      allow read: if signedIn();
       allow create, update, delete: if signedIn() && (isAdmin() || isFleetManager());
     }
 
     match /fleet_drivers/{driverId} {
-      allow read: if signedIn() && (isStaff() || isDriver());
+      allow read: if signedIn();
       allow create, update, delete: if signedIn() && (isAdmin() || isFleetManager());
     }
 
     match /fleet_routes/{routeId} {
-      allow read: if signedIn() && (isStaff() || isDriver());
+      allow read: if signedIn();
       allow create, update, delete: if signedIn() && (isAdmin() || isFleetManager());
     }
 
     match /notifications/{notificationId} {
-      allow read: if signedIn();
+      allow read: if signedIn() && (
+        isAdmin()
+        || notificationTargetsCurrentUser(resource.data)
+      );
       allow create: if signedIn();
       allow update: if signedIn() && (
         isAdmin()

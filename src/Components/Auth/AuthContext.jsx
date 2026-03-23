@@ -62,6 +62,15 @@ export const AuthProvider = ({ children }) => {
             profile.role || tokenResult?.claims?.role,
           );
 
+          console.info("[Auth] Resolved user profile", {
+            uid: currentUser.uid,
+            email: currentUser.email,
+            profileExists: profileSnap.exists(),
+            profileRole: profile.role || "",
+            tokenRole: tokenResult?.claims?.role || "",
+            resolvedRole,
+          });
+
           if (!currentUser.emailVerified && isEmailVerificationRequired(resolvedRole)) {
             try {
               await signOut(auth);
@@ -90,6 +99,11 @@ export const AuthProvider = ({ children }) => {
           });
         } catch (error) {
           console.error("Failed to resolve auth role:", error);
+          console.info("[Auth] Falling back to customer role", {
+            uid: currentUser.uid,
+            email: currentUser.email,
+            fallbackRole: ROLE.CUSTOMER,
+          });
             setUser({
               uid: currentUser.uid,
               email: currentUser.email,
@@ -167,14 +181,15 @@ export const AuthProvider = ({ children }) => {
       loading,
       roles: ROLE,
       signup: async (email, password, role = ROLE.CUSTOMER, profile = {}) => {
+        const normalizedEmail = email.trim().toLowerCase();
         const credential = await createUserWithEmailAndPassword(
           auth,
-          email,
+          normalizedEmail,
           password,
         );
-        const normalizedRole = normalizeRole(role);
+        const normalizedRole = ROLE.CUSTOMER;
         await setDoc(doc(db, "users", credential.user.uid), {
-          email,
+          email: normalizedEmail,
           role: normalizedRole,
           ...profile,
           createdAt: serverTimestamp(),

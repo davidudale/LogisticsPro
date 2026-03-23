@@ -38,6 +38,8 @@ const formatTimestamp = (quotation) => {
   }).format(new Date(timestampValue));
 };
 
+const formatStateName = (location) => location?.state || "Not available";
+
 const ShipmentQuotationsSection = () => {
   const {
     loading,
@@ -99,7 +101,7 @@ const ShipmentQuotationsSection = () => {
               <thead className="bg-slate-900/80">
                 <tr className="border-b border-slate-800 text-xs uppercase tracking-[0.12em] text-slate-400">
                   <th className="px-3 py-3">Quotation No</th>
-                  <th className="px-3 py-3">Timestamp</th>
+                  <th className="px-3 py-3">Last Updated</th>
                   <th className="px-3 py-3">Status</th>
                   <th className="px-3 py-3">Origin</th>
                   <th className="px-3 py-3">Destination</th>
@@ -137,8 +139,8 @@ const ShipmentQuotationsSection = () => {
                           {quotation.status || "Pending"}
                         </span>
                       </td>
-                      <td className="px-3 py-4 text-slate-300">{formatLocation(quotation.origin)}</td>
-                      <td className="px-3 py-4 text-slate-300">{formatLocation(quotation.destination)}</td>
+                      <td className="px-3 py-4 text-slate-300">{formatStateName(quotation.origin)}</td>
+                      <td className="px-3 py-4 text-slate-300">{formatStateName(quotation.destination)}</td>
                       <td className="px-3 py-4 text-slate-300">{quotation.cargo || "Not specified"}</td>
                       <td className="px-3 py-4 text-slate-300">{quotation.weight || "Not specified"}</td>
                       <td className="px-3 py-4 text-slate-300">

@@ -6,6 +6,7 @@ import InvoicePreviewModal from "../Shared/InvoicePreviewModal.jsx";
 const AccountsInvoices = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const { loading, invoiceOrders, formatCurrency, formatLocation, formatTimestamp } = useOutletContext();
+  const formatStateName = (location) => location?.state || "Not available";
 
   const sortedInvoices = useMemo(
     () => [...invoiceOrders].sort((left, right) => (right.quoteTotal || 0) - (left.quoteTotal || 0)),
@@ -55,8 +56,8 @@ const AccountsInvoices = () => {
                         <p className="mt-1 text-xs text-slate-500">{order.customerEmail || "No email"}</p>
                       </td>
                       <td className="px-4 py-4 text-slate-300">
-                        <p>{formatLocation(order.origin)}</p>
-                        <p className="mt-1 text-xs text-slate-500">{formatLocation(order.destination)}</p>
+                        <p>{formatStateName(order.origin)}</p>
+                        <p className="mt-1 text-xs text-slate-500">{formatStateName(order.destination)}</p>
                       </td>
                       <td className="px-4 py-4">
                         <span className="inline-flex rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-orange-300">

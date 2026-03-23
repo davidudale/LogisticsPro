@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from "react";
 import { ArrowRight, LoaderCircle, Search } from "lucide-react";
+import { getAuth } from "firebase/auth";
 import { collection, getDocs, getFirestore } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { app } from "../../Auth/firebase.js";
 
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 const COLLECTIONS = {
   orders: "customer_order",
@@ -78,6 +80,13 @@ const Hero = () => {
     if (!normalizedValue) {
       setTrackingError("Enter a tracking ID, order number, or quotation number.");
       setTrackingResult(null);
+      return;
+    }
+
+    if (!auth.currentUser) {
+      setTrackingError("Sign in to track shipments and quotations.");
+      setTrackingResult(null);
+      navigate("/login");
       return;
     }
 

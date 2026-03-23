@@ -16,16 +16,20 @@ import {
   doc,
   getFirestore,
   onSnapshot,
+  query,
   serverTimestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { toast } from "react-toastify";
 import NavBar from "../../Basics/NavBar.jsx";
 import { app } from "../../Auth/firebase.js";
 import Sidebar from "../../Basics/Sidebar.jsx";
+import { normalizeRole, ROLE } from "../../../utils/roles.js";
 
 const db = getFirestore(app);
 const DRIVERS_COLLECTION = "fleet_drivers";
+const USERS_COLLECTION = "users";
 
 const emptyDriverForm = {
   fullName: "",
@@ -51,6 +55,8 @@ const mapDriverRecord = (item) => {
   const data = item.data();
   return {
     firestoreId: item.id,
+    source: DRIVERS_COLLECTION,
+    isFleetRecord: true,
     fullName: data.fullName || "",
     email: data.email || "",
     phone: data.phone || "",
@@ -66,6 +72,36 @@ const mapDriverRecord = (item) => {
     updatedAt: data.updatedAt || null,
   };
 };
+
+const mapUserDriverRecord = (item) => {
+  const data = item.data();
+  return {
+    firestoreId: item.id,
+    source: USERS_COLLECTION,
+    isFleetRecord: false,
+    fullName: data.fullName || data.name || "",
+    email: data.email || "",
+    phone: data.phone || "",
+    licenseNo: data.licenseNo || "",
+    licenseExpiry: data.licenseExpiry || "",
+    assignedTruckId: data.assignedTruckId || data.truckId || data.vehicleId || "",
+    assignmentStatus: data.assignmentStatus || "Available",
+    territory: data.territory || "",
+    certificationStatus: data.certificationStatus || "Compliant",
+    incidentStatus: data.incidentStatus || "Clear",
+    notes: data.notes || "",
+    createdAt: data.createdAt || null,
+    updatedAt: data.updatedAt || null,
+    role: data.role || "",
+  };
+};
+
+const buildDriverKey = (driver) =>
+  [
+    driver.email?.trim().toLowerCase(),
+    driver.licenseNo?.trim().toLowerCase(),
+    driver.fullName?.trim().toLowerCase(),
+  ].find(Boolean) || driver.firestoreId;
 
 const getTimestampValue = (value) => {
   if (!value) return 0;
@@ -90,30 +126,74 @@ const formatTimestamp = (record) => {
 const DriverManagement = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("licenses");
-  const [drivers, setDrivers] = useState([]);
+  const [fleetDrivers, setFleetDrivers] = useState([]);
+  const [userDrivers, setUserDrivers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [busyDriverId, setBusyDriverId] = useState("");
   const [isDriverModalOpen, setIsDriverModalOpen] = useState(false);
   const [isDriverViewOpen, setIsDriverViewOpen] = useState(false);
   const [editingDriverId, setEditingDriverId] = useState("");
+  const [editingDriverSource, setEditingDriverSource] = useState(DRIVERS_COLLECTION);
   const [driverForm, setDriverForm] = useState(emptyDriverForm);
   const [selectedDriver, setSelectedDriver] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = onSnapshot(
+    const unsubscribeFleetDrivers = onSnapshot(
       collection(db, DRIVERS_COLLECTION),
       (snapshot) => {
-        setDrivers(snapshot.docs.map(mapDriverRecord));
+        setFleetDrivers(snapshot.docs.map(mapDriverRecord));
         setIsLoading(false);
       },
       (error) => {
+        console.error("[Firestore][DriverManagement] Failed watching collection", {
+          collection: DRIVERS_COLLECTION,
+          error,
+        });
         setIsLoading(false);
-        toast.error(error?.message || "Failed to load drivers.");
+        toast.error(error?.message || "Failed to load fleet drivers.");
       },
     );
 
-    return () => unsubscribe();
+    const unsubscribeUsers = onSnapshot(
+      query(collection(db, USERS_COLLECTION), where("role", "==", ROLE.DRIVER)),
+      (snapshot) => {
+        setUserDrivers(
+          snapshot.docs
+            .map(mapUserDriverRecord)
+            .filter((driver) => normalizeRole(driver.role) === ROLE.DRIVER),
+        );
+      },
+      (error) => {
+        console.error("[Firestore][DriverManagement] Failed watching collection", {
+          collection: USERS_COLLECTION,
+          error,
+        });
+        toast.error(error?.message || "Failed to load driver user profiles.");
+      },
+    );
+
+    return () => {
+      unsubscribeFleetDrivers();
+      unsubscribeUsers();
+    };
   }, []);
+
+  const drivers = useMemo(() => {
+    const mergedDrivers = new Map();
+
+    fleetDrivers.forEach((driver) => {
+      mergedDrivers.set(buildDriverKey(driver), driver);
+    });
+
+    userDrivers.forEach((driver) => {
+      const key = buildDriverKey(driver);
+      if (!mergedDrivers.has(key)) {
+        mergedDrivers.set(key, driver);
+      }
+    });
+
+    return [...mergedDrivers.values()];
+  }, [fleetDrivers, userDrivers]);
 
   const activeDrivers = useMemo(
     () => drivers.filter((driver) => driver.assignmentStatus !== "Inactive").length,
@@ -145,12 +225,14 @@ const DriverManagement = () => {
 
   const openAddDriverModal = () => {
     setEditingDriverId("");
+    setEditingDriverSource(DRIVERS_COLLECTION);
     setDriverForm(emptyDriverForm);
     setIsDriverModalOpen(true);
   };
 
   const openEditDriverModal = (driver) => {
     setEditingDriverId(driver.firestoreId);
+    setEditingDriverSource(driver.source || DRIVERS_COLLECTION);
     setDriverForm({ ...emptyDriverForm, ...driver });
     setIsDriverModalOpen(true);
   };
@@ -192,11 +274,13 @@ const DriverManagement = () => {
       updatedAt: serverTimestamp(),
     };
 
+    const targetCollection = editingDriverSource || DRIVERS_COLLECTION;
+
     setBusyDriverId(editingDriverId || payload.licenseNo);
 
     try {
       if (editingDriverId) {
-        await updateDoc(doc(db, DRIVERS_COLLECTION, editingDriverId), payload);
+        await updateDoc(doc(db, targetCollection, editingDriverId), payload);
         toast.success("Driver updated.");
       } else {
         await addDoc(collection(db, DRIVERS_COLLECTION), {
@@ -207,6 +291,7 @@ const DriverManagement = () => {
       }
       setIsDriverModalOpen(false);
       setEditingDriverId("");
+      setEditingDriverSource(DRIVERS_COLLECTION);
       setDriverForm(emptyDriverForm);
     } catch (error) {
       toast.error(error?.message || "Failed to save driver.");
@@ -342,7 +427,7 @@ const DriverManagement = () => {
                     <thead>
                       <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                         <th className="px-3 py-2">Driver</th>
-                        <th className="px-3 py-2">Timestamp</th>
+                        <th className="px-3 py-2">Last Updated</th>
                         <th className="px-3 py-2">Email</th>
                         <th className="px-3 py-2">Phone</th>
                         <th className="px-3 py-2">License No</th>
@@ -396,7 +481,7 @@ const DriverManagement = () => {
                                 <button
                                   type="button"
                                   onClick={() => removeDriver(driver)}
-                                  disabled={busyDriverId === driver.firestoreId}
+                                  disabled={busyDriverId === driver.firestoreId || !driver.isFleetRecord}
                                   className="inline-flex items-center gap-1 rounded-lg border border-rose-500/40 px-3 py-1.5 text-xs font-semibold text-rose-300 hover:bg-rose-500/10 disabled:opacity-60"
                                 >
                                   <Trash2 size={14} />

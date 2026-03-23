@@ -220,6 +220,10 @@ const CustomerManagement = () => {
         }),
       );
     } catch (loadError) {
+      console.error("[Firestore][CustomerManagement] Failed loading collections", {
+        collections: Object.values(COLLECTIONS),
+        error: loadError,
+      });
       const message = loadError?.message || "Failed to fetch records.";
       setError(message);
       toast.error(message);
@@ -516,7 +520,7 @@ const CustomerManagement = () => {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                       <th className="px-3 py-2">Type</th>
-                      <th className="px-3 py-2">Timestamp</th>
+                      <th className="px-3 py-2">Last Updated</th>
                       <th className="px-3 py-2">Company</th>
                       <th className="px-3 py-2">Contact</th>
                       <th className="px-3 py-2">Role</th>
@@ -663,7 +667,7 @@ const CustomerManagement = () => {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                       <th className="px-3 py-2">Order</th>
-                      <th className="px-3 py-2">Timestamp</th>
+                      <th className="px-3 py-2">Last Updated</th>
                       <th className="px-3 py-2">Customer</th>
                       <th className="px-3 py-2">Status</th>
                       <th className="px-3 py-2">ETA</th>
@@ -740,7 +744,7 @@ const CustomerManagement = () => {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                       <th className="px-3 py-2">Ticket</th>
-                      <th className="px-3 py-2">Timestamp</th>
+                      <th className="px-3 py-2">Last Updated</th>
                       <th className="px-3 py-2">Customer</th>
                       <th className="px-3 py-2">Topic</th>
                       <th className="px-3 py-2">State</th>

@@ -13,10 +13,11 @@ import {
 import { ArrowLeft, Building2, UserRound } from "lucide-react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
-import { app, secondaryAuth } from "../Auth/firebase";
+import { app, secondaryApp, secondaryAuth } from "../Auth/firebase";
 import { ROLE } from "../../utils/roles.js";
 
 const db = getFirestore(app);
+const onboardingDb = getFirestore(secondaryApp);
 
 const initialForm = {
   companyName: "",
@@ -239,7 +240,7 @@ const CustomerRegistration = () => {
         form.password,
       );
 
-      await setDoc(doc(db, "users", credential.user.uid), {
+      await setDoc(doc(onboardingDb, "users", credential.user.uid), {
         email: loginEmail,
         role: ROLE.CUSTOMER,
         fullName: trimmedContactName,
@@ -260,6 +261,7 @@ const CustomerRegistration = () => {
 
       const customerPayload = {
         uid: credential.user.uid,
+        role: ROLE.CUSTOMER,
         accountType,
         companyName: customerName,
         contactName: trimmedContactName,
@@ -319,7 +321,7 @@ const CustomerRegistration = () => {
         };
       }
 
-      await setDoc(doc(db, "customers", credential.user.uid), {
+      await setDoc(doc(onboardingDb, "customers", credential.user.uid), {
         ...customerPayload,
       });
 

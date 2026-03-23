@@ -41,6 +41,18 @@ const buildPaymentReference = (order) => {
   return seed.replace(/[^a-zA-Z0-9.=/-]/g, "-");
 };
 
+const extractCallableErrorMessage = (error) => {
+  if (!error) return "Payment verification failed.";
+  if (typeof error?.details === "string" && error.details.trim()) return error.details;
+  if (typeof error?.message === "string" && error.message.trim() && error.message.trim().toLowerCase() !== "internal") {
+    return error.message;
+  }
+  if (typeof error?.code === "string" && error.code.trim()) {
+    return `Payment verification failed (${error.code}).`;
+  }
+  return "Payment verification failed.";
+};
+
 export const startPaystackOrderPayment = async ({
   order,
   user,
@@ -92,7 +104,7 @@ export const startPaystackOrderPayment = async ({
           });
           resolve(result?.data || {});
         } catch (error) {
-          reject(error);
+          reject(new Error(extractCallableErrorMessage(error)));
         } finally {
           onVerifyEnd?.(transaction);
         }

@@ -147,7 +147,7 @@ const DriverAssignments = () => {
                       <thead className="bg-slate-900/80">
                         <tr className="border-b border-slate-800 text-xs uppercase tracking-[0.12em] text-slate-400">
                           <th className="px-3 py-3">Order No</th>
-                          <th className="px-3 py-3">Timestamp</th>
+                          <th className="px-3 py-3">Last Updated</th>
                           <th className="px-3 py-3">Customer</th>
                           <th className="px-3 py-3">Truck</th>
                           <th className="px-3 py-3">Delivery Address</th>

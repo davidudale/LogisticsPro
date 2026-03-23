@@ -145,6 +145,10 @@ const FleetTruckAssignments = () => {
           setLoading(false);
         },
         (error) => {
+          console.error("[Firestore][FleetTruckAssignments] Failed watching collection", {
+            collection: COLLECTIONS.bookings,
+            error,
+          });
           setLoading(false);
           toast.error(error?.message || "Failed to load shipment bookings.");
         },
@@ -155,6 +159,10 @@ const FleetTruckAssignments = () => {
           setVehicles(snapshot.docs.map(mapVehicleRecord).filter((vehicle) => vehicle.id));
         },
         (error) => {
+          console.error("[Firestore][FleetTruckAssignments] Failed watching collection", {
+            collection: COLLECTIONS.vehicles,
+            error,
+          });
           toast.error(error?.message || "Failed to load fleet vehicles.");
         },
       ),
@@ -164,6 +172,10 @@ const FleetTruckAssignments = () => {
           setDrivers(snapshot.docs.map(mapDriverRecord).filter((driver) => driver.fullName));
         },
         (error) => {
+          console.error("[Firestore][FleetTruckAssignments] Failed watching collection", {
+            collection: COLLECTIONS.drivers,
+            error,
+          });
           toast.error(error?.message || "Failed to load fleet drivers.");
         },
       ),
@@ -173,6 +185,10 @@ const FleetTruckAssignments = () => {
           setRoutes(snapshot.docs.map(mapRouteRecord).filter((route) => route.routeName));
         },
         (error) => {
+          console.error("[Firestore][FleetTruckAssignments] Failed watching collection", {
+            collection: COLLECTIONS.routes,
+            error,
+          });
           toast.error(error?.message || "Failed to load fleet routes.");
         },
       ),

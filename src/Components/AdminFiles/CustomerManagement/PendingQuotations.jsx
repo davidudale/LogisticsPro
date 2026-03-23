@@ -31,6 +31,11 @@ const formatLocation = (location) => {
   return [location.address, location.lga, location.state, location.country].filter(Boolean).join(", ");
 };
 
+const formatStateName = (location) => {
+  if (!location || typeof location !== "object") return "Not available";
+  return location.state || "Not available";
+};
+
 const formatDimensions = (dimensions) => {
   if (!dimensions || typeof dimensions !== "object") return "Not specified";
   return [dimensions.lengthCm, dimensions.widthCm, dimensions.heightCm].every(Boolean)
@@ -260,6 +265,10 @@ const PendingQuotations = () => {
       const snapshot = await getDocs(collection(db, "Quotations"));
       setQuotations(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
     } catch (error) {
+      console.error("[Firestore][PendingQuotations] Failed loading collection", {
+        collection: "Quotations",
+        error,
+      });
       toast.error(error?.message || "Failed to load quotations.");
     } finally {
       setLoading(false);
@@ -354,6 +363,11 @@ const PendingQuotations = () => {
       await loadQuotations();
       toast.success("Quotation updated successfully.");
     } catch (error) {
+      console.error("[Firestore][PendingQuotations] Failed updating document", {
+        collection: "Quotations",
+        documentId: quotationId,
+        error,
+      });
       toast.error(error?.message || "Failed to update quotation.");
     } finally {
       setBusyRow("");
@@ -386,6 +400,11 @@ const PendingQuotations = () => {
       closeDeleteModal();
       toast.success("Quotation deleted.");
     } catch (error) {
+      console.error("[Firestore][PendingQuotations] Failed deleting document", {
+        collection: "Quotations",
+        documentId: deleteTarget?.id || "",
+        error,
+      });
       toast.error(error?.message || "Failed to delete quotation.");
     } finally {
       setBusyRow("");
@@ -428,6 +447,11 @@ const PendingQuotations = () => {
       await loadQuotations();
       toast.success(`Order created successfully: ${orderNo}`);
     } catch (error) {
+      console.error("[Firestore][PendingQuotations] Failed creating order from quotation", {
+        collections: ["customer_order", "Quotations"],
+        quotationId: quotation.id,
+        error,
+      });
       toast.error(error?.message || "Failed to create order from quotation.");
     } finally {
       setBusyRow("");
@@ -505,6 +529,11 @@ const PendingQuotations = () => {
       setQuoteDraft(nextDraft);
       setQuoteModalOpen(true);
     } catch (error) {
+      console.error("[Firestore][PendingQuotations] Failed opening quotation details", {
+        collection: "Quotations",
+        quotationId: quotation.id,
+        error,
+      });
       toast.error(error?.message || "Failed to open quotation details.");
     } finally {
       setBusyRow("");
@@ -695,7 +724,7 @@ const PendingQuotations = () => {
                       <thead className="bg-slate-900/80">
                         <tr className="border-b border-slate-800">
                           <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Quotation</th>
-                          <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Timestamp</th>
+                          <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Last Updated</th>
                           <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Customer</th>
                           <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Origin</th>
                           <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Destination</th>
@@ -806,7 +835,7 @@ const PendingQuotations = () => {
                               ) : (
                                 <>
                                   <p className="max-w-[220px] text-sm leading-6 text-slate-300">
-                                    {formatLocation(quotation.origin)}
+                                    {formatStateName(quotation.origin)}
                                   </p>
                                   <p className="mt-2 text-xs text-slate-500">
                                     {formatCoordinates(quotation.origin?.coordinates)}
@@ -844,7 +873,7 @@ const PendingQuotations = () => {
                               ) : (
                                 <>
                                   <p className="max-w-[220px] text-sm leading-6 text-slate-300">
-                                    {formatLocation(quotation.destination)}
+                                    {formatStateName(quotation.destination)}
                                   </p>
                                   <p className="mt-2 text-xs text-slate-500">
                                     {formatCoordinates(quotation.destination?.coordinates)}

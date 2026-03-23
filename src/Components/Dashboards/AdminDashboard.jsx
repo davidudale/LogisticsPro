@@ -94,6 +94,10 @@ const AdminDashboard = () => {
         fleetVehicles: mapSnapshotDocs(fleetSnap),
       });
     } catch (error) {
+      console.error("[Firestore][AdminDashboard] Failed loading dashboard collections", {
+        collections: Object.values(COLLECTIONS),
+        error,
+      });
       toast.error(error?.message || "Failed to load admin dashboard.");
     } finally {
       setLoading(false);
