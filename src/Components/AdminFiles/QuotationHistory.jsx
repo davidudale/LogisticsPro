@@ -22,7 +22,7 @@ const resumableQuotationStatuses = new Set([
   "Quotation Drafted",
   "Quotation Sent and Pending Client Review",
   "Quotation Under Negotiation",
-  "Quotation Accepted",
+  "Shipment Awaiting Approval",
 ]);
 
 const formatLocation = (location) => {
@@ -557,7 +557,7 @@ const QuotationHistory = () => {
 
   const filteredQuotations = useMemo(() => {
     const visibleQuotations = quotations.filter(
-      (quotation) => quotation.status === "Quotation Accepted",
+      (quotation) => quotation.status === "Shipment Awaiting Approval",
     );
     const query = searchQuery.trim().toLowerCase();
     const sortByNewest = (items) => [...items].sort(

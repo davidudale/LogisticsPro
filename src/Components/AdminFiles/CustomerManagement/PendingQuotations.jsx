@@ -635,7 +635,7 @@ const PendingQuotations = () => {
 
   const filteredQuotations = useMemo(() => {
     const visibleQuotations = quotations.filter(
-      (quotation) => quotation.status !== "SAVE" && quotation.status !== "Quotation Accepted",
+      (quotation) => quotation.status !== "SAVE" && quotation.status !== "Shipment Awaiting Approval",
     );
     const query = searchQuery.trim().toLowerCase();
     const sortByNewest = (items) => [...items].sort(
@@ -1235,7 +1235,7 @@ const PendingQuotations = () => {
                       ? "Sending..."
                       : selectedQuotation.status === "Quotation Sent and Pending Client Review"
                         ? "Send quotation"
-                        : "Confirm and Send quotation"}
+                        : "Confirm and Send Quotation"}
                   </button>
                 </div>
               </div>

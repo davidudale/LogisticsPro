@@ -765,11 +765,11 @@ const buildQuotationPayload = (resolvedQuotationNo, status) => ({
 
   const dashboardMetrics = useMemo(() => {
     const openOrders = customerOrders.filter((order) => !deliveredStatuses.has((order.status || "").toString().trim().toLowerCase())).length;
-    const inTransit = customerOrders.filter((order) => transitStatuses.has((order.status || "").toString().trim().toLowerCase())).length;
+    const inTransit = customerOrders.filter(( ) => transitStatuses.has(("Shipment in transit").toString().trim().toLowerCase())).length;
     const delivered = customerOrders.filter((order) => deliveredStatuses.has((order.status || "").toString().trim().toLowerCase())).length;
     const activeQuotations = customerQuotations.filter((quotation) => {
       const normalizedStatus = (quotation.status || "").toString().trim().toLowerCase();
-      return normalizedStatus !== "save" && normalizedStatus !== "quotation accepted";
+      return normalizedStatus !== "save" && normalizedStatus !== "shipment awaiting approval";
     }).length;
 
     const recentActivity = [
@@ -937,8 +937,8 @@ const buildQuotationPayload = (resolvedQuotationNo, status) => ({
             </section>
 
             <section className="grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
-              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
-                <div className="flex items-center justify-between gap-3">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6 ">
+                <div className="flex items-center justify-between gap-3 ">
                   <div>
                     <p className="text-xs uppercase tracking-[0.18em] text-slate-500">Recent Activity</p>
                     <h2 className="mt-2 text-xl font-semibold text-white">Latest quotation and shipment updates</h2>
@@ -953,25 +953,35 @@ const buildQuotationPayload = (resolvedQuotationNo, status) => ({
                     View all
                   </button>
                 </div>
-                <div className="mt-5 space-y-3">
+                <div className="mt-5 space-y-3 ">
                   {recordsLoading ? (
-                    <p className="text-sm text-slate-400">Loading your latest activity...</p>
+                    <p className="text-sm text-slate-400 ">Loading your latest activity...</p>
                   ) : dashboardMetrics.recentActivity.length ? (
-                    dashboardMetrics.recentActivity.map((entry) => (
+                    dashboardMetrics.recentActivity.map((entry, index) => (
                       <button
                         key={entry.id}
                         type="button"
                         onClick={() => navigate(entry.to)}
-                        className="w-full rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-left transition hover:border-orange-500/30 hover:bg-slate-900"
+                        className={`w-full rounded-2xl border p-4 text-left transition ${
+                          index === 0
+                            ? "border-slate-800 bg-slate-950/60 hover:bg-orange-500/15"
+                            : "border-slate-800 bg-slate-950/60 hover:border-orange-500/30 hover:bg-slate-900"
+                        }`}
                       >
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex flex-col gap-2 sm:flex-row  sm:items-start sm:justify-between rounded-lg px-3 py-2">
                           <div>
                             <p className="text-sm font-semibold text-white">{entry.title}</p>
                             <p className="mt-1 text-sm text-slate-400">{entry.subtitle}</p>
                           </div>
                           <p className="text-xs text-slate-500">{formatTimestamp(entry.updatedAt)}</p>
                         </div>
-                        <div className="mt-3 inline-flex rounded-full border border-slate-700 bg-slate-900/80 px-3 py-1 text-xs font-semibold text-slate-200">
+                        <div
+                          className={`mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
+                            index === 0
+                              ? "border-orange-500/40 bg-gradient-to-r from-orange-500/20 via-orange-500/8 to-transparent text-orange-100 shadow-[0_18px_40px_-28px_rgba(249,115,22,0.95)"
+                              : "border-slate-700 bg-slate-900 text-slate-200"
+                          }`}
+                        >
                           {entry.status}
                         </div>
                       </button>

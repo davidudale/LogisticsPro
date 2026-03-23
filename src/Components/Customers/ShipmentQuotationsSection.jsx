@@ -5,7 +5,7 @@ import { Link, useOutletContext } from "react-router-dom";
 const visiblePricingStatuses = new Set([
   "Quotation Sent and Pending Client Review",
   "Quotation Under Negotiation",
-  "Quotation Accepted",
+  "Shipment Awaiting Approval",
 ]);
 const negotiationReasons = [
   "Price is too high",

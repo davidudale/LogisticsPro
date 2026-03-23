@@ -8,6 +8,7 @@ import Login from "./Components/Auth/Login.jsx";
 import Register from "./Components/Auth/Register.jsx";
 import ProtectedRoute from "./Components/Auth/ProtectedRoute.jsx";
 import CustomersDashboard from "./Components/Dashboards/CustomersDashboard.jsx";
+import OpsUserDashboard from "./Components/Dashboards/OpsUserDashboard.jsx";
 import Drivers from "./Components/Dashboards/Drivers.jsx";
 import DriverAssignments from "./Components/Drivers/DriverAssignments.jsx";
 import StaffDashboard from "./Components/Dashboards/StaffDashboard.jsx";
@@ -65,7 +66,7 @@ const App = () => {
           </Route>
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["opsuser"]} />}>
-          <Route path="/opsuser" element={<CustomersDashboard />} />
+          <Route path="/opsuser" element={<OpsUserDashboard />} />
           <Route path="/opsuser/shipments" element={<CustomersShipment />}>
             <Route index element={<Navigate to="quotations" replace />} />
             <Route path="quotations" element={<ShipmentQuotationsSection />} />

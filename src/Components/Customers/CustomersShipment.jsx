@@ -113,7 +113,7 @@ const CustomersShipment = () => {
   const filteredOrders = useMemo(() => {
     const acceptedQuotationIds = new Set(
       quotations
-        .filter((quotation) => quotation.status === "Quotation Accepted")
+        .filter((quotation) => quotation.status === "Shipment Awaiting Approval")
         .map((quotation) => quotation.id),
     );
     const value = queryValue.trim().toLowerCase();
@@ -192,21 +192,21 @@ const CustomersShipment = () => {
         });
       }
 
-      await updateDoc(doc(db, "Quotations", quotationId), {
-        status: decision === "accept" ? "Quotation Accepted" : "Quotation Under Negotiation",
-        customerDecision: decision,
-        customerNegotiationReason: decision === "reject" ? reason.trim() : "",
-        customerDecisionAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+        await updateDoc(doc(db, "Quotations", quotationId), {
+          status: decision === "accept" ? "Shipment Awaiting Approval" : "Quotation Under Negotiation",
+          customerDecision: decision,
+          customerNegotiationReason: decision === "reject" ? reason.trim() : "",
+          customerDecisionAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
 
       await createNotificationRecord({
-        title: decision === "accept" ? "Quotation Accepted" : "Quotation Under Negotiation",
+        title: decision === "accept" ? "Shipment Awaiting Approval" : "Quotation Under Negotiation",
         message: decision === "accept"
-          ? `${targetQuotation.customerName || "Customer"} accepted quotation ${targetQuotation.quotationNo || quotationId}.`
+          ? `${targetQuotation.customerName || "Customer"} moved quotation ${targetQuotation.quotationNo || quotationId} to shipment awaiting approval.`
           : `${targetQuotation.customerName || "Customer"} requested negotiation on quotation ${targetQuotation.quotationNo || quotationId}${reason.trim() ? `: ${reason.trim()}` : "."}`,
         targetRole: "admin",
-        type: decision === "accept" ? "quotation_accepted" : "quotation_negotiation_requested",
+        type: decision === "accept" ? "shipment_awaiting_approval" : "quotation_negotiation_requested",
         quotationNo: targetQuotation.quotationNo || "",
         customerUid: user?.uid || targetQuotation.customerUid || "",
         customerEmail: user?.email || targetQuotation.customerEmail || "",
@@ -217,7 +217,7 @@ const CustomersShipment = () => {
             quotation.id === quotationId
               ? {
                   ...quotation,
-                  status: decision === "accept" ? "Quotation Accepted" : "Quotation Under Negotiation",
+                  status: decision === "accept" ? "Shipment Awaiting Approval" : "Quotation Under Negotiation",
                   customerDecision: decision,
                   customerNegotiationReason: decision === "reject" ? reason.trim() : "",
                 }

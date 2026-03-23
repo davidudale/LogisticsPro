@@ -188,6 +188,7 @@ service cloud.firestore {
         isAdmin()
         || isOpsStaff()
         || ownsResource(resource.data)
+        || ownsResource(request.resource.data)
       );
       allow delete: if signedIn() && (isAdmin() || isOpsStaff());
     }

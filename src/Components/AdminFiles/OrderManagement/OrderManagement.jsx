@@ -1014,7 +1014,7 @@ const OrderManagement = () => {
                                     onClick={() => setSelectedInvoice(row)}
                                     className="inline-flex items-center gap-1 rounded-md border border-sky-500/40 px-2 py-1 text-xs text-sky-200 hover:bg-sky-500/10"
                                   >
-                                    <Eye size={12} /> View Invoice
+                                    <Eye size={12} /> Order Invoice
                                   </button>
                                 ) : (
                                   <button
