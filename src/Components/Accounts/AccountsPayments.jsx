@@ -105,7 +105,7 @@ const AccountsPayments = () => {
                   <th className="px-4 py-3">Balance Due</th>
                   <th className="px-4 py-3">Payment Status</th>
                   <th className="px-4 py-3">Reference</th>
-                  <th className="px-4 py-3">Updated</th>
+                  <th className="px-4 py-3">Date Created</th>
                   <th className="px-4 py-3">Action</th>
                 </tr>
               </thead>

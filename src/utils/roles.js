@@ -68,6 +68,7 @@ export const getShipmentsPathByRole = (role, section = "") => {
 export const isEmailVerificationRequired = (role) => {
   const normalizedRole = normalizeRole(role);
   return normalizedRole !== ROLE.ADMIN
+    && normalizedRole !== ROLE.OPSUSER
     && normalizedRole !== ROLE.OPSMANAGER
     && normalizedRole !== ROLE.FLEETMANAGER
     && normalizedRole !== ROLE.AUDITOR

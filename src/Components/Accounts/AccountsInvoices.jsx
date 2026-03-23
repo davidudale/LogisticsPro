@@ -35,7 +35,7 @@ const AccountsInvoices = () => {
                   <th className="px-4 py-3">Route</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Invoice Total</th>
-                  <th className="px-4 py-3">Updated</th>
+                  <th className="px-4 py-3">Date Created</th>
                   <th className="px-4 py-3">Action</th>
                 </tr>
               </thead>

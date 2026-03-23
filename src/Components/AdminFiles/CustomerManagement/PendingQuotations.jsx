@@ -724,7 +724,7 @@ const PendingQuotations = () => {
                       <thead className="bg-slate-900/80">
                         <tr className="border-b border-slate-800">
                           <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Quotation</th>
-                          <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Last Updated</th>
+                          <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Date Created</th>
                           <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Customer</th>
                           <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Origin</th>
                           <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Destination</th>

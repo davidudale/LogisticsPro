@@ -744,7 +744,7 @@ const CustomerManagement = () => {
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-[0.12em] text-slate-400">
                       <th className="px-3 py-2">Ticket</th>
-                      <th className="px-3 py-2">Last Updated</th>
+                      <th className="px-3 py-2">Date Created</th>
                       <th className="px-3 py-2">Customer</th>
                       <th className="px-3 py-2">Topic</th>
                       <th className="px-3 py-2">State</th>

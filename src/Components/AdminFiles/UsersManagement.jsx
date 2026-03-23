@@ -140,6 +140,11 @@ const mapUserRecord = (item) => {
 };
 
 const UsersManagement = () => {
+  const hiddenRoles = [ROLE.CUSTOMER, ROLE.DRIVER];
+  const visibleRoleOptions = useMemo(
+    () => ROLE_OPTIONS.filter((role) => !hiddenRoles.includes(role.value)),
+    [],
+  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -172,14 +177,19 @@ const UsersManagement = () => {
     return () => unsubscribe();
   }, []);
 
+  const visibleUsers = useMemo(
+    () => users.filter((user) => !hiddenRoles.includes(user.role)),
+    [users],
+  );
+
   const sortedUsers = useMemo(
     () =>
-      [...users].sort(
+      [...visibleUsers].sort(
         (left, right) =>
           getTimestampValue(right.updatedAt || right.createdAt)
           - getTimestampValue(left.updatedAt || left.createdAt),
       ),
-    [users],
+    [visibleUsers],
   );
 
   const filteredUsers = useMemo(() => {
@@ -204,19 +214,19 @@ const UsersManagement = () => {
     });
   }, [query, roleFilter, sortedUsers]);
 
-  const totalUsers = users.length;
+  const totalUsers = visibleUsers.length;
   const activeUsers = useMemo(
-    () => users.filter((user) => normalizeStatus(user.accountStatus) === "active").length,
-    [users],
+    () => visibleUsers.filter((user) => normalizeStatus(user.accountStatus) === "active").length,
+    [visibleUsers],
   );
   const pendingUsers = useMemo(
     () =>
-      users.filter((user) => ["pending", "invited"].includes(normalizeStatus(user.accountStatus))).length,
-    [users],
+      visibleUsers.filter((user) => ["pending", "invited"].includes(normalizeStatus(user.accountStatus))).length,
+    [visibleUsers],
   );
   const privilegedUsers = useMemo(
-    () => users.filter((user) => ["admin", "opsmanager", "fleetmanager", "auditor", "accounts"].includes(user.role)).length,
-    [users],
+    () => visibleUsers.filter((user) => ["admin", "opsmanager", "fleetmanager", "auditor", "accounts"].includes(user.role)).length,
+    [visibleUsers],
   );
 
   const openCreateModal = () => {
@@ -436,7 +446,7 @@ const UsersManagement = () => {
                     className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-white outline-none transition focus:border-orange-500"
                   >
                     <option value="all">All roles</option>
-                    {ROLE_OPTIONS.map((role) => (
+                    {visibleRoleOptions.map((role) => (
                       <option key={role.value} value={role.value}>
                         {role.label}
                       </option>
@@ -454,8 +464,8 @@ const UsersManagement = () => {
                         <th className="px-4 py-3 text-left font-semibold uppercase tracking-[0.16em]">Role</th>
                         <th className="px-4 py-3 text-left font-semibold uppercase tracking-[0.16em]">Status</th>
                         <th className="px-4 py-3 text-left font-semibold uppercase tracking-[0.16em]">Account</th>
-                        <th className="px-4 py-3 text-left font-semibold uppercase tracking-[0.16em]">Verification</th>
-                        <th className="px-4 py-3 text-left font-semibold uppercase tracking-[0.16em]">Updated</th>
+                        {/*<th className="px-4 py-3 text-left font-semibold uppercase tracking-[0.16em]">Verification</th>*/}
+                        <th className="px-4 py-3 text-left font-semibold uppercase tracking-[0.16em]">Date Created</th>
                         <th className="px-4 py-3 text-right font-semibold uppercase tracking-[0.16em]">Action</th>
                       </tr>
                     </thead>
@@ -493,7 +503,7 @@ const UsersManagement = () => {
                             <td className="px-4 py-4 text-slate-300">
                               {(user.accountType || "internal").replace(/_/g, " ")}
                             </td>
-                            <td className="px-4 py-4">
+                            {/*<td className="px-4 py-4">
                               <span
                                 className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${
                                   user.emailVerified === true
@@ -509,7 +519,7 @@ const UsersManagement = () => {
                                     ? "Pending"
                                     : "Unknown"}
                               </span>
-                            </td>
+                            </td>*/}
                             <td className="px-4 py-4 text-slate-400">
                               {formatTimestamp(user.updatedAt || user.createdAt)}
                             </td>
@@ -613,7 +623,7 @@ const UsersManagement = () => {
                     onChange={(event) => setCreateForm((prev) => ({ ...prev, role: event.target.value }))}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-500"
                   >
-                     {ROLE_OPTIONS.map((role) => (
+                     {visibleRoleOptions.map((role) => (
                        <option key={role.value} value={role.value}>
                          {role.label}
                        </option>
@@ -641,7 +651,7 @@ const UsersManagement = () => {
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/70 p-4 text-sm text-slate-400">
                   <p className="font-semibold text-white">{formatRoleLabel(createForm.role)}</p>
                   <p className="mt-2">
-                    {ROLE_OPTIONS.find((role) => role.value === createForm.role)?.detail}
+                    {visibleRoleOptions.find((role) => role.value === createForm.role)?.detail}
                   </p>
                 </div>
 
@@ -764,7 +774,7 @@ const UsersManagement = () => {
                     onChange={(event) => setEditForm((prev) => ({ ...prev, role: event.target.value }))}
                     className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-orange-500"
                   >
-                    {ROLE_OPTIONS.map((role) => (
+                    {visibleRoleOptions.map((role) => (
                       <option key={role.value} value={role.value}>
                         {role.label}
                       </option>
