@@ -3,6 +3,7 @@ import {
   ArrowRight,
   CheckCircle2,
 } from "lucide-react";
+import { NavLink } from "react-router-dom";
 import NavBar from "../../Basics/NavBar.jsx";
 import Sidebar from "../../Basics/Sidebar.jsx";
 
@@ -72,8 +73,8 @@ const AdminSectionPage = ({
               <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
                 <h2 className="text-lg font-semibold text-white">Operational Actions</h2>
                 <div className="mt-4 space-y-3">
-                  {actionCards.map(({ title: itemTitle, detail }) => (
-                    <div key={itemTitle} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                  {actionCards.map(({ title: itemTitle, detail, to }) => {
+                    const cardContent = (
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold text-white">{itemTitle}</p>
@@ -81,8 +82,26 @@ const AdminSectionPage = ({
                         </div>
                         <ArrowRight size={16} className="mt-1 text-slate-500" />
                       </div>
-                    </div>
-                  ))}
+                    );
+
+                    if (to) {
+                      return (
+                        <NavLink
+                          key={itemTitle}
+                          to={to}
+                          className="block rounded-xl border border-slate-800 bg-slate-950/60 p-4 transition-colors hover:border-orange-500/30 hover:bg-slate-900/80"
+                        >
+                          {cardContent}
+                        </NavLink>
+                      );
+                    }
+
+                    return (
+                      <div key={itemTitle} className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+                        {cardContent}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </section>

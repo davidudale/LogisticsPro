@@ -78,7 +78,12 @@ const App = () => {
         <Route element={<ProtectedRoute allowedRoles={["fleetmanager"]} />}>
           <Route path="/fleet-manager" element={<FleetManagerDashboard />} />
           <Route path="/fleet-manager/vehicles" element={<FleetManagement />} />
+          <Route path="/fleet-manager/drivers" element={<DriverManagement />} />
           <Route path="/fleet-manager/assignments" element={<FleetTruckAssignments />} />
+          <Route path="/fleet-manager/routes" element={<RouteManagement />} />
+          <Route path="/fleet-manager/maintenance" element={<MaintenanceManagement />} />
+          <Route path="/fleet-manager/fuel" element={<FuelManagement />} />
+          <Route path="/fleet-manager/tracking" element={<TrackingMonitoring />} />
           <Route path="/fleet-manager/compliance" element={<ComplianceManagement />} />
           <Route path="/fleet-manager/reports" element={<FleetReportsAnalytics />} />
         </Route>
@@ -117,28 +122,28 @@ const App = () => {
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
           <Route path="/admin/customers" element={<CustomerManagement />} />
         </Route>
-        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={[ "opsmanager","fleetmanager", "admin" ]} />}>
           <Route path="/admin/fleet" element={<FleetManagement />} />
         </Route>
-        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["opsmanager","fleetmanager","admin"]} />}>
           <Route path="/admin/driver" element={<DriverManagement />} />
         </Route>
-        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["opsmanager","fleetmanager","admin"]} />}>
           <Route path="/admin/fleet/routes" element={<RouteManagement />} />
         </Route>
-        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["opsmanager","fleetmanager","admin"]} />}>
           <Route path="/admin/fleet/maintenance" element={<MaintenanceManagement />} />
         </Route>
-        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["opsmanager","fleetmanager","admin"]} />}>
           <Route path="/admin/fleet/fuel" element={<FuelManagement />} />
         </Route>
-        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["opsmanager","fleetmanager","admin"]} />}>
           <Route path="/admin/fleet/tracking" element={<TrackingMonitoring />} />
         </Route>
-        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["opsmanager","fleetmanager","admin"]} />}>
           <Route path="/admin/fleet/compliance" element={<ComplianceManagement />} />
         </Route>
-        <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route element={<ProtectedRoute allowedRoles={["opsmanager","fleetmanager","admin"]} />}>
           <Route path="/admin/fleet/reports" element={<FleetReportsAnalytics />} />
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>

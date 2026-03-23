@@ -86,14 +86,35 @@ const roleLinks = {
   opsmanager: [
     { label: "Dashboard", to: "/opsmanager", icon: LayoutDashboard },
     {
-      label: "Operations Workspace",
-      icon: Truck,
+      label: "Quotation Desk",
+      icon: ClipboardList,
       children: [
         { label: "Pending Quotations", to: "/admin/pendingQuotation", icon: Package },
         { label: "Quotation History", to: "/admin/quotationsHistory", icon: ClipboardList },
+      ],
+    },
+    {
+      label: "Shipment Execution",
+      icon: Truck,
+      children: [
         { label: "Order Management", to: "/admin/orders", icon: Truck },
       ],
     },
+    {
+        label: "Fleet Oversight",
+        icon: Truck,
+        children: [
+          { label: "Truck Assignments", to: "/fleet-manager/assignments", icon: ClipboardList },
+         { label: "Vehicle Management", to: "/fleet-manager/vehicles", icon: Truck },
+            { label: "Driver Management", to: "/fleet-manager/drivers", icon: Users },
+            { label: "Route Management", to: "/fleet-manager/routes", icon: Route },
+            { label: "Maintenance Management", to: "/fleet-manager/maintenance", icon: Wrench },
+            { label: "Fuel Management", to: "/fleet-manager/fuel", icon: Fuel },
+            { label: "Tracking & Monitoring", to: "/fleet-manager/tracking", icon: MapPin },
+            { label: "Compliance Management", to: "/fleet-manager/compliance", icon: ShieldCheck },
+            { label: "Reporting & Analytics", to: "/fleet-manager/reports", icon: BarChart3 },
+        ]
+          },
   ],
   fleetmanager: [
     { label: "Dashboard", to: "/fleet-manager", icon: LayoutDashboard },
@@ -102,11 +123,16 @@ const roleLinks = {
         icon: Truck,
         children: [
           { label: "Truck Assignments", to: "/fleet-manager/assignments", icon: ClipboardList },
-          { label: "Vehicle Management", to: "/fleet-manager/vehicles", icon: Truck },
-          { label: "Compliance", to: "/fleet-manager/compliance", icon: ShieldCheck },
-          { label: "Reports", to: "/fleet-manager/reports", icon: BarChart3 },
-        ],
-      },
+         { label: "Vehicle Management", to: "/fleet-manager/vehicles", icon: Truck },
+            { label: "Driver Management", to: "/fleet-manager/drivers", icon: Users },
+            { label: "Route Management", to: "/fleet-manager/routes", icon: Route },
+            { label: "Maintenance Management", to: "/fleet-manager/maintenance", icon: Wrench },
+            { label: "Fuel Management", to: "/fleet-manager/fuel", icon: Fuel },
+            { label: "Tracking & Monitoring", to: "/fleet-manager/tracking", icon: MapPin },
+            { label: "Compliance Management", to: "/fleet-manager/compliance", icon: ShieldCheck },
+            { label: "Reporting & Analytics", to: "/fleet-manager/reports", icon: BarChart3 },
+        ]
+          },
   ],
   auditor: [
     { label: "Dashboard", to: "/auditor", icon: LayoutDashboard },

@@ -292,6 +292,164 @@ const AdminDashboard = () => {
                 </div>
               ))}
             </section>
+
+            <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                      Quick Actions
+                    </p>
+                    <h2 className="mt-2 text-xl font-semibold text-white">
+                      Operational Shortcuts
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={loadDashboard}
+                    disabled={loading}
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl border border-orange-500/30 bg-orange-500/10 px-4 py-2.5 text-sm font-semibold text-orange-100 transition hover:border-orange-400 hover:bg-orange-500/20 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    <RefreshCw
+                      size={16}
+                      className={loading ? "animate-spin" : ""}
+                    />
+                    {loading ? "Refreshing..." : "Refresh"}
+                  </button>
+                </div>
+                <div className="mt-4 grid gap-3">
+                  {quickActions.map((action) => (
+                    <button
+                      key={action.label}
+                      type="button"
+                      onClick={() => navigate(action.to)}
+                      className="flex items-start justify-between gap-4 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-left transition hover:border-orange-500/30 hover:bg-slate-900/80"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-white">
+                          {action.label}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-400">
+                          {action.description}
+                        </p>
+                      </div>
+                      <ArrowRight size={18} className="mt-1 shrink-0 text-slate-500" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
+                <div className="flex items-center gap-3">
+                  <Clock3 size={18} className="text-orange-400" />
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                      Live Feed
+                    </p>
+                    <h2 className="mt-2 text-xl font-semibold text-white">
+                      Recent Activity
+                    </h2>
+                  </div>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {loading ? (
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-500">
+                      Building the latest admin activity snapshot...
+                    </div>
+                  ) : metrics.recentActivity.length ? (
+                    metrics.recentActivity.map((entry) => (
+                      <div
+                        key={entry.id}
+                        className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-white">
+                              {entry.title}
+                            </p>
+                            <p className="mt-1 text-sm text-slate-400">
+                              {entry.subtitle}
+                            </p>
+                          </div>
+                          <span className="rounded-full border border-slate-700 px-2.5 py-1 text-[11px] uppercase tracking-[0.12em] text-slate-300">
+                            {entry.type}
+                          </span>
+                        </div>
+                        <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500">
+                          <span>{entry.status}</span>
+                          <span>{formatTimestamp(entry.updatedAt)}</span>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-500">
+                      No admin activity is available yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                    Verified Users
+                  </p>
+                  <UserCog size={18} className="text-orange-400" />
+                </div>
+                <p className="mt-3 text-3xl font-bold text-white">
+                  {loading ? "--" : metrics.verifiedUsers}
+                </p>
+                <p className="mt-2 text-sm text-slate-400">
+                  Profiles with confirmed email access.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                    Total Users
+                  </p>
+                  <Users size={18} className="text-orange-400" />
+                </div>
+                <p className="mt-3 text-3xl font-bold text-white">
+                  {loading ? "--" : metrics.totalUsers}
+                </p>
+                <p className="mt-2 text-sm text-slate-400">
+                  Access-bearing profiles across the platform.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                    Fleet Assets
+                  </p>
+                  <Boxes size={18} className="text-orange-400" />
+                </div>
+                <p className="mt-3 text-3xl font-bold text-white">
+                  {loading ? "--" : dashboardData.fleetVehicles.length}
+                </p>
+                <p className="mt-2 text-sm text-slate-400">
+                  Total tracked vehicles in the system.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/40 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+                    Security Coverage
+                  </p>
+                  <ShieldCheck size={18} className="text-orange-400" />
+                </div>
+                <p className="mt-3 text-3xl font-bold text-emerald-300">
+                  {loading || !metrics.totalUsers
+                    ? "--"
+                    : `${Math.round((metrics.verifiedUsers / metrics.totalUsers) * 100)}%`}
+                </p>
+                <p className="mt-2 text-sm text-slate-400">
+                  Share of user profiles already verified.
+                </p>
+              </div>
+            </section>
           </div>
         </main>
       </div>
