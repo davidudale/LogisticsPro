@@ -198,7 +198,7 @@ const OpsUserDashboard = () => {
                 <div className="relative flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
                   <div className="max-w-3xl">
                     <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
-                      Ops User Desk
+                      Ops UserDesk
                     </p>
                     <h1 className="mt-3 text-3xl font-bold text-white lg:text-4xl">
                       Shipment Booking And Quotation Flow
