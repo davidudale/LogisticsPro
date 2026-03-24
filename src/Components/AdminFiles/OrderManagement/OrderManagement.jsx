@@ -238,8 +238,12 @@ const OrderManagement = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
 
   const currentUserRole = (user?.role || "").toLowerCase();
+  const isOpsManager = currentUserRole === "opsmanager";
+  const canPreviewBookingInsteadOfDelete = currentUserRole === "opsmanager";
   const canViewInvoiceInsteadOfDelete = ["opsuser", "admin"].includes(currentUserRole);
   const canApproveTruckAssignment = ["admin", "opsmanager"].includes((user?.role || "").toLowerCase());
+  const isSelectedBookingApprovedPendingPickup = isOpsManager
+    && (selectedBooking?.status || "").toString().trim().toLowerCase() === "shipment approved - pending pickup";
 
   const filteredCustomers = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -700,7 +704,11 @@ const OrderManagement = () => {
     if (!selectedBooking?.id) return;
     const bookingTruckId = selectedDriver?.assignedTruckId || selectedTruckId || "";
     if (!bookingTruckId) {
-      toast.error("Select a truck before sending this shipment for approval.");
+      toast.error(
+        isOpsManager
+          ? "Select a truck before approving this shipment."
+          : "Select a truck before sending this shipment for approval.",
+      );
       return;
     }
     setBusyRow(`book-${selectedBooking.id}`);
@@ -731,7 +739,7 @@ const OrderManagement = () => {
         assignedRouteId: selectedRoute?.id || "",
         assignedRouteName: selectedRoute?.routeName || "",
         truckId: bookingTruckId,
-        status: "Shipment Awaiting Approval",
+        status: isOpsManager ? "Shipment Approved - Pending Pickup" : "Shipment Awaiting Approval",
         eta: nextEta,
         routeDistanceKm: routeMetrics?.distanceKm || selectedBooking.routeDistanceKm || 0,
         routeDurationMinutes: routeMetrics?.durationMinutes || selectedBooking.routeDurationMinutes || 0,
@@ -747,18 +755,29 @@ const OrderManagement = () => {
         type: "assignment_created",
       });
       await createOpsUserNotification({
-        title: "Shipment Awaiting Approval",
-        message: `Order ${selectedBooking.orderNo} is now awaiting approval${selectedDriver?.fullName ? ` with driver ${selectedDriver.fullName}` : ""}${selectedRoute?.routeName ? ` on route ${selectedRoute.routeName}` : ""}${nextEta ? ` with ETA ${nextEta}` : ""}.`,
+        title: isOpsManager ? "Shipment Approved - Pending Pickup" : "Shipment Awaiting Approval",
+        message: isOpsManager
+          ? `Order ${selectedBooking.orderNo} has been approved and is now pending pickup${selectedDriver?.fullName ? ` with driver ${selectedDriver.fullName}` : ""}${selectedRoute?.routeName ? ` on route ${selectedRoute.routeName}` : ""}${nextEta ? ` with ETA ${nextEta}` : ""}.`
+          : `Order ${selectedBooking.orderNo} is now awaiting approval${selectedDriver?.fullName ? ` with driver ${selectedDriver.fullName}` : ""}${selectedRoute?.routeName ? ` on route ${selectedRoute.routeName}` : ""}${nextEta ? ` with ETA ${nextEta}` : ""}.`,
         customerUid: selectedBooking.customerUid || "",
         customerEmail: selectedBooking.customerEmail || "",
         orderNo: selectedBooking.orderNo,
         quotationNo: selectedBooking.quotationNo || "",
-        type: "shipment_awaiting_approval",
+        type: isOpsManager ? "shipment_approved_pending_pickup" : "shipment_awaiting_approval",
       });
-      toast.success(`Shipment sent for approval for order ${selectedBooking.orderNo}.`);
+      toast.success(
+        isOpsManager
+          ? `Shipment approved for order ${selectedBooking.orderNo}.`
+          : `Shipment sent for approval for order ${selectedBooking.orderNo}.`,
+      );
       closeBookingPreview();
     } catch (bookingError) {
-      toast.error(bookingError?.message || "Failed to send shipment for approval.");
+      toast.error(
+        bookingError?.message
+        || (isOpsManager
+          ? "Failed to approve shipment."
+          : "Failed to send shipment for approval."),
+      );
     } finally {
       setBusyRow("");
     }
@@ -995,6 +1014,8 @@ const OrderManagement = () => {
                           (row.status || "").toString().trim().toLowerCase() === "shipment booking - in progress";
                         const isTruckAssignedPendingApproval =
                           (row.status || "").toString().trim().toLowerCase() === "shipment awaiting approval";
+                        const isShipmentApprovedPendingPickup =
+                          (row.status || "").toString().trim().toLowerCase() === "shipment approved - pending pickup";
 
                         return (
                           <tr key={row.id} className="border-t border-slate-800">
@@ -1008,7 +1029,34 @@ const OrderManagement = () => {
                             <td className="px-3 py-3 text-slate-300">{row.status}</td>
                             <td className="px-3 py-3">
                               <div className="flex items-center gap-2 flex-wrap">
-                                {canViewInvoiceInsteadOfDelete ? (
+                                {canPreviewBookingInsteadOfDelete ? (
+                                  isShipmentApprovedPendingPickup ? (
+                                    <>
+                                      <button
+                                        type="button"
+                                        onClick={() => setSelectedInvoice(row)}
+                                        className="inline-flex items-center gap-1 rounded-md border border-sky-500/40 px-2 py-1 text-xs text-sky-200 hover:bg-sky-500/10"
+                                      >
+                                        <Eye size={12} /> View Order
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => openBookingPreview(row)}
+                                        className="inline-flex items-center gap-1 rounded-md border border-orange-500/40 px-2 py-1 text-xs text-orange-200 hover:bg-orange-500/10"
+                                      >
+                                        <Eye size={12} /> View Shipment
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => openBookingPreview(row)}
+                                      className="inline-flex items-center gap-1 rounded-md border border-orange-500/40 px-2 py-1 text-xs text-orange-200 hover:bg-orange-500/10"
+                                    >
+                                      <Eye size={12} /> View
+                                    </button>
+                                  )
+                                ) : canViewInvoiceInsteadOfDelete ? (
                                   <button
                                     type="button"
                                     onClick={() => setSelectedInvoice(row)}
@@ -1026,7 +1074,7 @@ const OrderManagement = () => {
                                     <Trash2 size={12} /> Delete
                                   </button>
                                 )}
-                                {isShipmentBookingInProgress ? (
+                                {isShipmentBookingInProgress && !canPreviewBookingInsteadOfDelete ? (
                                   <button
                                     type="button"
                                     onClick={() => openBookingPreview(row)}
@@ -1036,7 +1084,7 @@ const OrderManagement = () => {
                                     <Trash2 size={12} /> Continue Booking
                                   </button>
                                 ) : null}
-                                {isTruckAssignedPendingApproval && canApproveTruckAssignment ? (
+                                {isTruckAssignedPendingApproval && canApproveTruckAssignment && !isOpsManager ? (
                                   <button
                                     type="button"
                                     onClick={() => approveTruckAssignment(row)}
@@ -1424,19 +1472,23 @@ const OrderManagement = () => {
                     </div>
                   </div>
                   {!selectedDriver ? <p className="mt-4 text-sm text-amber-300">Driver assignment is optional. You can still book this shipment with the selected truck.</p> : null}
-                  <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                    <button
-                      type="button"
-                      onClick={saveShipmentDraft}
-                      disabled={busyRow === `book-${selectedBooking.id}` || busyRow === `draft-${selectedBooking.id}`}
-                      className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-800 disabled:opacity-60"
-                    >
-                      {busyRow === `draft-${selectedBooking.id}` ? "Saving..." : "Save Draft"}
-                    </button>
-                    <button type="button" onClick={sendShipmentForApproval} disabled={!resolvedTruckId || busyRow === `book-${selectedBooking.id}` || busyRow === `draft-${selectedBooking.id}`} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
-                      {busyRow === `book-${selectedBooking.id}` ? "Sending..." : "Send for Approval"}
-                    </button>
-                  </div>
+                  {!isSelectedBookingApprovedPendingPickup ? (
+                    <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={saveShipmentDraft}
+                        disabled={busyRow === `book-${selectedBooking.id}` || busyRow === `draft-${selectedBooking.id}`}
+                        className="rounded-lg border border-slate-600 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-slate-800 disabled:opacity-60"
+                      >
+                        {busyRow === `draft-${selectedBooking.id}` ? "Saving..." : "Save Draft"}
+                      </button>
+                      <button type="button" onClick={sendShipmentForApproval} disabled={!resolvedTruckId || busyRow === `book-${selectedBooking.id}` || busyRow === `draft-${selectedBooking.id}`} className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:opacity-60">
+                        {busyRow === `book-${selectedBooking.id}`
+                          ? (isOpsManager ? "Approving..." : "Sending...")
+                          : (isOpsManager ? "Approve Shipment" : "Send for Approval")}
+                      </button>
+                    </div>
+                  ) : null}
                   </div>
                 </div>
               </div>

@@ -10,6 +10,7 @@ const AccountsDashboard = () => {
     const totalReceived = invoiceOrders.reduce((sum, order) => sum + Number(order.amountPaid || 0), 0);
     const outstanding = Math.max(totalBilled - totalReceived, 0);
     const openInvoices = invoiceOrders.filter((order) => order.balanceDue > 0).length;
+    
     return {
       totalBilled,
       totalReceived,

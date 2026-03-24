@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { ArrowRight, Box, CreditCard, Printer, ShieldCheck } from "lucide-react";
-import { useOutletContext } from "react-router-dom";
+import { useLocation, useOutletContext } from "react-router-dom";
 import { toast } from "react-toastify";
 import InvoicePreviewModal from "../Shared/InvoicePreviewModal.jsx";
 import { startPaystackOrderPayment } from "../../Services/paystack.js";
@@ -9,6 +9,7 @@ const ShipmentOrdersSection = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [paymentOrder, setPaymentOrder] = useState(null);
   const [savingPayment, setSavingPayment] = useState(false);
+  const location = useLocation();
   const {
     loading,
     filteredOrders,
@@ -16,6 +17,15 @@ const ShipmentOrdersSection = () => {
     formatLocation,
     formatDimensions,
   } = useOutletContext();
+  const isPaymentsView = location.pathname.endsWith("/payments");
+  const sectionTitle = isPaymentsView ? "Payments" : "Shipment Requests";
+  const emptyTitle = isPaymentsView ? "No payment-ready shipments found." : "No shipment requests found.";
+  const emptyDescription = isPaymentsView
+    ? "Accepted shipment orders with unpaid balances will appear here."
+    : "Create a new order from your dashboard to see it here.";
+  const sectionDescription = isPaymentsView
+    ? "Review outstanding shipment balances, print invoices, and complete checkout securely."
+    : "Track created orders with their route, cargo details, dimensions, and ETA.";
   const formatStateName = (location) => location?.state || "Not available";
   const getTimestampValue = (value) => {
     if (!value) return 0;
@@ -53,6 +63,13 @@ const ShipmentOrdersSection = () => {
     ),
     [filteredOrders],
   );
+  const visibleOrders = useMemo(() => (
+    isPaymentsView
+      ? sortedOrders.filter(
+        (order) => (order.paymentStatus || "").toString().trim().toLowerCase() !== "paid",
+      )
+      : sortedOrders
+  ), [isPaymentsView, sortedOrders]);
 
   const openPaymentModal = (order) => {
     setPaymentOrder(order);
@@ -92,11 +109,11 @@ const ShipmentOrdersSection = () => {
     <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-8 text-center text-sm text-slate-400">
       Fetching your shipment requests...
     </div>
-  ) : filteredOrders.length === 0 ? (
-    <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/30 p-8 text-center">
-      <p className="text-base font-semibold text-white">No shipment requests found.</p>
+  ) : visibleOrders.length === 0 ? (
+      <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/30 p-8 text-center">
+      <p className="text-base font-semibold text-white">{emptyTitle}</p>
       <p className="mt-2 text-sm text-slate-400">
-        Create a new order from your dashboard to see it here.
+        {emptyDescription}
       </p>
     </div>
   ) : (
@@ -104,10 +121,10 @@ const ShipmentOrdersSection = () => {
     <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-5">
       <div className="flex items-center gap-2">
         <Box size={18} className="text-orange-400" />
-        <h3 className="text-lg font-semibold text-white">Shipment Requests</h3>
+        <h3 className="text-lg font-semibold text-white">{sectionTitle}</h3>
       </div>
       <p className="mt-2 text-sm text-slate-400">
-        Track created orders with their route, cargo details, dimensions, and ETA.
+        {sectionDescription}
       </p>
 
       <div className="mt-4 overflow-hidden rounded-2xl border border-slate-800">
@@ -130,7 +147,7 @@ const ShipmentOrdersSection = () => {
               </tr>
             </thead>
             <tbody>
-              {sortedOrders.map((order) => {
+              {visibleOrders.map((order) => {
                 const isPaid = (order.paymentStatus || "").toString().trim().toLowerCase() === "paid";
 
                 return (
@@ -182,7 +199,7 @@ const ShipmentOrdersSection = () => {
                           <Printer size={14} />
                           Print
                         </button>
-                        {!isPaid ? (
+                        {isPaymentsView && !isPaid ? (
                           <button
                             type="button"
                             onClick={() => openPaymentModal(order)}

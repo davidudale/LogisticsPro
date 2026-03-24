@@ -56,6 +56,9 @@ const CustomersShipment = () => {
   const shipmentSections = [
     { label: "My Quotations", to: getShipmentsPathByRole(user?.role, "quotations") },
     { label: "Shipment Requests", to: getShipmentsPathByRole(user?.role, "requests") },
+    ...(user?.role === "customer"
+      ? [{ label: "Payments", to: getShipmentsPathByRole(user?.role, "payments") }]
+      : []),
   ];
 
   useEffect(() => {

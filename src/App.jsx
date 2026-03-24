@@ -63,6 +63,7 @@ const App = () => {
             <Route index element={<Navigate to="quotations" replace />} />
             <Route path="quotations" element={<ShipmentQuotationsSection />} />
             <Route path="requests" element={<ShipmentOrdersSection />} />
+            <Route path="payments" element={<ShipmentOrdersSection />} />
           </Route>
         </Route>
         <Route element={<ProtectedRoute allowedRoles={["opsuser"]} />}>

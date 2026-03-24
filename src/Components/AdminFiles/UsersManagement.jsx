@@ -35,6 +35,16 @@ import {
 
 const db = getFirestore(app);
 const USERS_COLLECTION = "users";
+const defaultDriverProfile = {
+  licenseNo: "",
+  licenseExpiry: "",
+  assignedTruckId: "",
+  assignmentStatus: "Available",
+  territory: "",
+  certificationStatus: "Compliant",
+  incidentStatus: "Clear",
+  notes: "",
+};
 
 const accountStatusOptions = [
   { value: "active", label: "Active" },
@@ -140,7 +150,7 @@ const mapUserRecord = (item) => {
 };
 
 const UsersManagement = () => {
-  const hiddenRoles = [ROLE.CUSTOMER, ROLE.DRIVER];
+  const hiddenRoles = [ROLE.CUSTOMER];
   const visibleRoleOptions = useMemo(
     () => ROLE_OPTIONS.filter((role) => !hiddenRoles.includes(role.value)),
     [],
@@ -290,6 +300,7 @@ const UsersManagement = () => {
     setBusyUserId(`create:${normalizedEmail}`);
 
     try {
+      const normalizedRoleValue = normalizeRole(createForm.role);
       const credential = await createUserWithEmailAndPassword(
         secondaryAuth,
         normalizedEmail,
@@ -301,10 +312,11 @@ const UsersManagement = () => {
         fullName: trimmedName,
         name: trimmedName,
         phone: trimmedPhone,
-        role: normalizeRole(createForm.role),
+        role: normalizedRoleValue,
         accountStatus: normalizeStatus(createForm.accountStatus),
         accountType: "internal",
         emailVerified: false,
+        ...(normalizedRoleValue === ROLE.DRIVER ? defaultDriverProfile : {}),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -358,13 +370,15 @@ const UsersManagement = () => {
     setBusyUserId(editingUserId);
 
     try {
+      const normalizedRoleValue = normalizeRole(editForm.role);
       await updateDoc(doc(db, USERS_COLLECTION, editingUserId), {
         email: normalizedEmail,
         fullName: trimmedName,
         name: trimmedName,
         phone: trimmedPhone,
-        role: normalizeRole(editForm.role),
+        role: normalizedRoleValue,
         accountStatus: normalizeStatus(editForm.accountStatus),
+        ...(normalizedRoleValue === ROLE.DRIVER ? defaultDriverProfile : {}),
         updatedAt: serverTimestamp(),
       });
       toast.success("User profile updated.");
