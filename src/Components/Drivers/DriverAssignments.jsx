@@ -35,6 +35,8 @@ const DriverAssignments = () => {
   const [assignments, setAssignments] = useState([]);
   const [queryValue, setQueryValue] = useState("");
   const { user } = useAuth();
+  const driverUid = (user?.uid || "").toString().trim();
+  const driverName = (user?.displayName || user?.profile?.fullName || user?.profile?.name || "").toString().trim();
 
   const assignedTruckId = (
     user?.profile?.truckId || user?.profile?.vehicleId || user?.profile?.assignedTruckId || ""
@@ -42,7 +44,7 @@ const DriverAssignments = () => {
 
   useEffect(() => {
     const loadAssignments = async () => {
-      if (!assignedTruckId) {
+      if (!assignedTruckId && !driverUid) {
         setAssignments([]);
         setLoading(false);
         return;
@@ -50,10 +52,30 @@ const DriverAssignments = () => {
 
       setLoading(true);
       try {
-        const snapshot = await getDocs(
-          query(collection(db, "customer_order"), where("truckId", "==", assignedTruckId)),
+        const queries = [
+          ...(assignedTruckId
+            ? [getDocs(query(collection(db, "customer_order"), where("truckId", "==", assignedTruckId)))]
+            : []),
+          ...(driverUid
+            ? [getDocs(query(collection(db, "customer_order"), where("assignedDriverId", "==", driverUid)))]
+            : []),
+        ];
+
+        const snapshots = await Promise.all(queries);
+        const mergedAssignments = new Map();
+
+        snapshots.forEach((snapshot) => {
+          snapshot.docs.forEach((item) => {
+            mergedAssignments.set(item.id, { id: item.id, ...item.data() });
+          });
+        });
+
+        setAssignments(
+          [...mergedAssignments.values()].filter(
+            (item) =>
+              (item.status || "").toString().trim().toLowerCase() === "shipment approved - pending pickup",
+          ),
         );
-        setAssignments(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })));
       } catch (error) {
         toast.error(error?.message || "Failed to load your assignments.");
       } finally {
@@ -62,7 +84,7 @@ const DriverAssignments = () => {
     };
 
     loadAssignments();
-  }, [assignedTruckId]);
+  }, [assignedTruckId, driverUid]);
 
   const filteredAssignments = useMemo(() => {
     const value = queryValue.trim().toLowerCase();
@@ -79,6 +101,7 @@ const DriverAssignments = () => {
       [
         assignment.orderNo,
         assignment.customerName,
+        assignment.assignedDriverName,
         assignment.status,
         assignment.deliveryAddress,
         assignment.truckId,
@@ -97,12 +120,15 @@ const DriverAssignments = () => {
           <div className="mx-auto max-w-7xl space-y-6">
             <header className="rounded-2xl border border-slate-800 bg-slate-900/40 p-6">
               <p className="text-xs uppercase tracking-[0.24em] text-slate-500">Driver Tasks</p>
-              <h1 className="mt-2 text-3xl font-bold text-white">Assigned Loads</h1>
+              <h1 className="mt-2 text-3xl font-bold text-white">Pending Pickup Loads</h1>
               <p className="mt-2 text-sm text-slate-400">
-                Review orders mapped to your assigned truck and follow delivery instructions.
+                Review shipment orders approved for pickup and mapped to your assigned truck or driver profile.
               </p>
               <p className="mt-4 inline-flex rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-orange-200">
                 Truck ID: {assignedTruckId || "Not set on profile"}
+              </p>
+              <p className="mt-3 inline-flex rounded-full border border-slate-700 bg-slate-900/70 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">
+                Driver: {driverName || user?.email || driverUid || "Not set on profile"}
               </p>
             </header>
 
@@ -118,26 +144,26 @@ const DriverAssignments = () => {
                   />
                 </div>
                 <div className="text-sm text-slate-400">
-                  {loading ? "Loading assignments..." : `${filteredAssignments.length} assignment${filteredAssignments.length === 1 ? "" : "s"}`}
+                  {loading ? "Loading pickup orders..." : `${filteredAssignments.length} pickup order${filteredAssignments.length === 1 ? "" : "s"}`}
                 </div>
               </div>
 
-              {!assignedTruckId ? (
+              {!assignedTruckId && !driverUid ? (
                 <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/30 p-8 text-center">
-                  <p className="text-base font-semibold text-white">No truck linked to this driver profile.</p>
+                  <p className="text-base font-semibold text-white">No driver assignment context found.</p>
                   <p className="mt-2 text-sm text-slate-400">
-                    Add `truckId`, `vehicleId`, or `assignedTruckId` to the driver user profile to receive assignment notifications.
+                    Add `truckId`, `vehicleId`, or `assignedTruckId` to the driver profile, or assign orders directly to this driver account.
                   </p>
                 </div>
               ) : loading ? (
                 <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-8 text-center text-sm text-slate-400">
-                  Fetching your assigned loads...
+                  Fetching approved pickup orders...
                 </div>
               ) : filteredAssignments.length === 0 ? (
                 <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-950/30 p-8 text-center">
-                  <p className="text-base font-semibold text-white">No assignments found.</p>
+                  <p className="text-base font-semibold text-white">No approved pickup orders found.</p>
                   <p className="mt-2 text-sm text-slate-400">
-                    New assignments for truck {assignedTruckId} will appear here automatically.
+                    Orders assigned to {driverName || user?.email || "this driver"} or truck {assignedTruckId || "not set"} will appear here once they reach Shipment Approved - Pending Pickup.
                   </p>
                 </div>
               ) : (
@@ -149,6 +175,7 @@ const DriverAssignments = () => {
                           <th className="px-3 py-3">Order No</th>
                           <th className="px-3 py-3">Last Updated</th>
                           <th className="px-3 py-3">Customer</th>
+                          <th className="px-3 py-3">Assigned Driver</th>
                           <th className="px-3 py-3">Truck</th>
                           <th className="px-3 py-3">Delivery Address</th>
                           <th className="px-3 py-3">Status</th>
@@ -160,6 +187,7 @@ const DriverAssignments = () => {
                             <td className="px-3 py-4 font-semibold text-white">{assignment.orderNo || "Order"}</td>
                             <td className="px-3 py-4 text-slate-400">{formatTimestamp(assignment)}</td>
                             <td className="px-3 py-4 text-slate-300">{assignment.customerName || "Customer"}</td>
+                            <td className="px-3 py-4 text-slate-300">{assignment.assignedDriverName || driverName || "Not assigned"}</td>
                             <td className="px-3 py-4 text-slate-300">
                               <span className="inline-flex items-center gap-2">
                                 <Truck size={14} className="text-orange-400" />

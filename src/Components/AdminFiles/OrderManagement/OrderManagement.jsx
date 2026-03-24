@@ -19,6 +19,7 @@ import { useAuth } from "../../Auth/AuthContext.jsx";
 import { createNotificationRecord } from "../../Auth/notificationUtils.js";
 import { computeRouteMetrics, isGoogleMapsConfigured } from "../../../Services/googleMaps.js";
 import InvoicePreviewModal from "../../Shared/InvoicePreviewModal.jsx";
+import { normalizeRole, ROLE } from "../../../utils/roles.js";
 
 const db = getFirestore(app);
 
@@ -30,6 +31,7 @@ const COLLECTIONS = {
   fleetVehicles: "fleet_vehicles",
   fleetDrivers: "fleet_drivers",
   fleetRoutes: "fleet_routes",
+  users: "users",
 };
 
 const formatLocation = (location) => {
@@ -148,6 +150,18 @@ const mapDriverRecord = (item) => {
   };
 };
 
+const mapUserDriverRecord = (item) => {
+  const data = item.data();
+  return {
+    id: item.id,
+    fullName: data.fullName || data.name || "",
+    assignedTruckId: normalizeIdentifier(data.assignedTruckId || data.truckId || data.vehicleId),
+    assignmentStatus: data.assignmentStatus || "Available",
+    territory: data.territory || "",
+    certificationStatus: data.certificationStatus || "Compliant",
+  };
+};
+
 const mapRouteRecord = (item) => {
   const data = item.data();
   return {
@@ -214,6 +228,7 @@ const OrderManagement = () => {
   const [supportTickets, setSupportTickets] = useState([]);
   const [fleetVehicles, setFleetVehicles] = useState([]);
   const [fleetDrivers, setFleetDrivers] = useState([]);
+  const [userDrivers, setUserDrivers] = useState([]);
   const [fleetRoutes, setFleetRoutes] = useState([]);
 
   const [loading, setLoading] = useState(true);
@@ -238,12 +253,14 @@ const OrderManagement = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
 
   const currentUserRole = (user?.role || "").toLowerCase();
+  const isOpsUser = currentUserRole === "opsuser";
   const isOpsManager = currentUserRole === "opsmanager";
   const canPreviewBookingInsteadOfDelete = currentUserRole === "opsmanager";
   const canViewInvoiceInsteadOfDelete = ["opsuser", "admin"].includes(currentUserRole);
   const canApproveTruckAssignment = ["admin", "opsmanager"].includes((user?.role || "").toLowerCase());
   const isSelectedBookingApprovedPendingPickup = isOpsManager
     && (selectedBooking?.status || "").toString().trim().toLowerCase() === "shipment approved - pending pickup";
+  const availableDrivers = isOpsUser ? userDrivers : fleetDrivers;
 
   const filteredCustomers = useMemo(() => {
     const value = query.trim().toLowerCase();
@@ -281,8 +298,8 @@ const OrderManagement = () => {
   );
 
   const selectedDriver = useMemo(
-    () => fleetDrivers.find((driver) => driver.id === selectedDriverId) || null,
-    [fleetDrivers, selectedDriverId],
+    () => availableDrivers.find((driver) => driver.id === selectedDriverId) || null,
+    [availableDrivers, selectedDriverId],
   );
 
   const resolvedTruckId = selectedDriver?.assignedTruckId || selectedTruckId || "";
@@ -520,6 +537,25 @@ const OrderManagement = () => {
       },
     );
 
+    const unsubscribeUsers = onSnapshot(
+      collection(db, COLLECTIONS.users),
+      (snapshot) => {
+        setUserDrivers(
+          snapshot.docs
+            .filter((item) => normalizeRole(item.data()?.role) === ROLE.DRIVER)
+            .map(mapUserDriverRecord)
+            .filter((driver) => driver.fullName),
+        );
+      },
+      (snapshotError) => {
+        console.error("[Firestore][OrderManagement] Failed watching collection", {
+          collection: COLLECTIONS.users,
+          error: snapshotError,
+        });
+        toast.error(snapshotError?.message || "Failed to watch driver users.");
+      },
+    );
+
     const unsubscribeFleetRoutes = onSnapshot(
       collection(db, COLLECTIONS.fleetRoutes),
       (snapshot) => {
@@ -540,6 +576,7 @@ const OrderManagement = () => {
       unsubscribeSupport();
       unsubscribeFleetVehicles();
       unsubscribeFleetDrivers();
+      unsubscribeUsers();
       unsubscribeFleetRoutes();
     };
   }, []);
@@ -662,7 +699,7 @@ const OrderManagement = () => {
   };
 
   const openBookingPreview = (customer) => {
-    const matchedDriver = fleetDrivers.find(
+    const matchedDriver = availableDrivers.find(
       (driver) => driver.assignedTruckId && driver.assignedTruckId === (customer.truckId || "").trim().toUpperCase(),
     );
     const matchedDriverRoutes = matchedDriver
@@ -1381,7 +1418,7 @@ const OrderManagement = () => {
                       <p className="text-xs uppercase tracking-[0.12em] text-slate-500">Assigned Driver </p>
                       <select value={selectedDriverId} onChange={(event) => setSelectedDriverId(event.target.value)} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2 text-sm text-white outline-none focus:border-orange-500">
                         <option value="">Book without driver</option>
-                        {fleetDrivers.map((driver) => (
+                        {availableDrivers.map((driver) => (
                           <option key={driver.id} value={driver.id}>
                             {driver.fullName}
                           </option>
